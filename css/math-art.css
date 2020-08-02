@@ -8,7 +8,7 @@ a {
 	font-family: America, sans-serif;
 }
 
-a:hover {
+a:hover, .nav-tabs .nav-link:hover {
 	color: hsl(225, 100%, 50%);
 	text-decoration: none;
 	text-shadow: 0 0 15px #00000066;
@@ -34,12 +34,12 @@ option:disabled {
 	color: #bbb;
 }
 
-.btn-primary {
+.btn-primary, .btn-primary:disabled {
 	background-color: var(--primary);
 	border-color: var(--primary);
 }
 
-.btn-success {
+.btn-success, .btn-success:disabled {
 	background-color: var(--success);
 	border-color: var(--success);
 }
@@ -217,7 +217,7 @@ button.btn-black:hover {
 	margin-left: 1px;
 }
 
-.nav-tabs .nav-link {
+.nav-tabs a.nav-link {
 	background-color: hsl(270, 17%, 97%);
     border-color: #ddd;
 	border-top-left-radius: 0.7rem;
@@ -231,7 +231,6 @@ button.btn-black:hover {
 .nav-tabs .nav-link:hover {
 	background-color: #fdfdfd;
 	border-color: #ddd;
-	color: black;
 }
 
 .nav-tabs .nav-link.active:hover {
