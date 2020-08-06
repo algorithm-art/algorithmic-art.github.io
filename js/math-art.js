@@ -619,10 +619,7 @@ function showBackgroundOptions() {
 
 	bgGeneratorImage.onload = redraw;
 
-	const backgroundGenerators = new Map();
-	let currentSketch;
-	const backgroundGenOptionsDOM = new Map();
-	let generatorURL, startFrame, endFrame, tweenData, animController;
+	let currentSketch, generatorURL, startFrame, endFrame, tweenData, animController;
 	let helpDoc, helpContextItem;
 	let helpContext = false;
 	let helpContextIntermediate = false; // True after mouse down but before mouse click.
@@ -960,21 +957,6 @@ function showBackgroundOptions() {
 		elem.timeout = setTimeout(hideAlert, 6000, jquery);
 	}
 
-	function generatorFactory(url) {
-		let generator = backgroundGenerators.get(url);
-		if (generator === undefined) {
-			const resolvedURL = /^http(s)?:/.test(url) ? url : '/sketch/' + url;
-			return import(resolvedURL).then(function (module) {
-				const constructor = module.default;
-				const generator = new constructor();
-				backgroundGenerators.set(url, generator);
-				return generator;
-			});
-		} else {
-			return Promise.resolve(generator);
-		}
-	}
-
 	const modalMargin = 0;
 	modal.style.left = Math.max(Math.round(window.innerWidth - 506 - modalMargin), 0) + 'px';
 
@@ -1056,6 +1038,7 @@ function showBackgroundOptions() {
 		if (sketch.thumbnail) {
 			thumbnail = document.createElement('IMG');
 			thumbnail.alt = sketch.title;
+			thumbnail.height = 168;
 		} else {
 			thumbnail = document.createElement('DIV');
 			thumbnail.classList.add('bg-dark', 'text-white', 'no-thumbnail');
@@ -1162,11 +1145,10 @@ function showBackgroundOptions() {
 		}
 
 		// Switch generator
-		const gen = await generatorFactory(url)
-		if (bgGenerator && bgGenerator.purgeCache) {
-			bgGenerator.purgeCache();
-		}
-		bgGenerator = gen;
+		const resolvedURL = /^http(s)?:/.test(url) ? url : '/sketch/' + url;
+		const genModule = await import(resolvedURL)
+		const constructor = genModule.default;
+		bgGenerator = new constructor();
 		generatorURL = url;
 
 		// Initialize sketch
@@ -1180,17 +1162,20 @@ function showBackgroundOptions() {
 		const saveBtn = document.getElementById('btn-save-form');
 		saveBtn.hidden = !enableSave;
 		// Render sketch
-		const hasTween = 'tween' in gen;
+		const hasTween = 'tween' in bgGenerator;
 		if (hasTween) {
-			gen.tween = parseFloat(animPositionSlider.value);
+			bgGenerator.tween = parseFloat(animPositionSlider.value);
 			tweenData = new TweenData(bgGenerator, startFrame, endFrame);
 		}
-		if (gen.isShader && !gen.shaderSource) {
+		if (bgGenerator.isShader) {
 			const fragFileContent = (await Promise.all([
 				requireScript('lib/gl-matrix.min.js'),
 				downloadFile(url.slice(0, -3) + '.frag', 'text')
 			]))[1];
-			gen.shaderSource = fragmentShaderHeader + shaderDeclarations(gen) + fragFileContent;
+			bgGenerator.shaderSource =
+				fragmentShaderHeader +
+				shaderDeclarations(bgGenerator) +
+				fragFileContent;
 			drawingContext.initializeShader(bgGenerator);
 			drawingContext.setProperties(bgGenerator);
 		}
@@ -1199,20 +1184,12 @@ function showBackgroundOptions() {
 
 		// Create new options dialog
 		container.innerHTML = '';
-		// Try to get from cache first.
-		let elements = backgroundGenOptionsDOM.get(url);
-		if (elements === undefined) {
-			const optionsDoc = await gen.optionsDocument;
-			if (optionsDoc !== undefined) {
-				for (let resetButton of optionsDoc.querySelectorAll('button[data-reset]')) {
-					resetButton.addEventListener('click', resetControl);
-				}
-				elements = Array.from(optionsDoc.body.children);
-				backgroundGenOptionsDOM.set(url, elements);
+		const optionsDoc = await bgGenerator.optionsDocument;
+		if (optionsDoc !== undefined) {
+			for (let resetButton of optionsDoc.querySelectorAll('button[data-reset]')) {
+				resetButton.addEventListener('click', resetControl);
 			}
-		}
-		if (elements !== undefined) {
-			container.append(...elements);
+			container.append(...optionsDoc.body.children);
 			const imageCtrlLocation = container.querySelector('[data-attach=image]');
 			if (imageCtrlLocation !== null) {
 				imageCtrlLocation.appendChild(imageUpload);
@@ -1220,7 +1197,7 @@ function showBackgroundOptions() {
 		}
 
 		// Adapt the environment's UI accordingly
-		document.getElementById('btn-generate-background').parentElement.hidden = !gen.hasRandomness;
+		document.getElementById('btn-generate-background').parentElement.hidden = !bgGenerator.hasRandomness;
 		document.getElementById('btn-both-frames').hidden = !hasTween;
 		document.getElementById('btn-both-frames2').hidden = !hasTween;
 		toolbar.hidden = false;
@@ -1229,17 +1206,17 @@ function showBackgroundOptions() {
 			urlParameters.set('gen', name);
 			updateURL();
 		}
-		document.title = gen.title;
+		document.title = bgGenerator.title;
 
 		// Load help file & display new sketch options
 		const helpArea = document.getElementById('help-sketch');
 		helpArea.innerHTML = '';
 		helpDoc = undefined;
-		titleBar.innerHTML = gen.title;
+		titleBar.innerHTML = bgGenerator.title;
 		container.hidden = false;
 		repositionModal(true);
-		if (gen.helpFile) {
-			helpDoc = await downloadFile(gen.helpFile, 'document');
+		if (bgGenerator.helpFile) {
+			helpDoc = await downloadFile(bgGenerator.helpFile, 'document');
 			const intro = helpDoc.getElementById('about');
 			if (intro !== null) {
 				helpArea.appendChild(intro);
@@ -1911,27 +1888,35 @@ function showBackgroundOptions() {
 	async function captureVideo(contextualInfo, width, height, startTween, length, properties) {
 		const renderButton = document.getElementById('btn-render-video');
 		renderButton.disabled = true;
+		const closeWidget = document.getElementById('video-modal').querySelector('.close');
+		closeWidget.hidden = true;
 		progressBar.style.width = '0';
 		progressBar.innerHTML = '0%';
 		progressBar.setAttribute('aria-valuenow', '0');
 		const progressRow = document.getElementById('video-progress-row');
-		progressRow.hidden = false;
+		progressRow.classList.remove('invisible');
 
 		await requireScript('lib/CCapture.all.min.js');
 		const capturer = new CCapture(properties);
 		animController = animate(bgGenerator, contextualInfo, width, height, startTween, length, loopAnim, capturer);
-		const stopButton = document.getElementById('btn-stop-video-render');
-		stopButton.disabled = false;
+		const stopButton = document.getElementById('btn-cancel-video');
+		stopButton.innerHTML = 'Abort';
+		stopButton.classList.add('btn-danger');
+		stopButton.classList.remove('btn-secondary');
 
 		function reset() {
-			stopButton.disabled = true;
 			capturer.stop();
-			progressRow.hidden = true;
+			stopButton.innerHTML = 'Close';
+			stopButton.classList.add('btn-secondary');
+			stopButton.classList.remove('btn-danger');
+			progressRow.classList.add('invisible');
+			closeWidget.hidden = false;
 			renderButton.disabled = false;
 			if (debug.video) {
 				document.body.removeChild(contextualInfo.twoD.canvas);
+				canvas.hidden = false;
 			}
-			canvas.style.display = 'block';
+			animController = undefined;
 		}
 		animController.promise = animController.promise.then(
 			function () {
@@ -2338,6 +2323,7 @@ function showBackgroundOptions() {
 		animPositionSlider.value = tween;
 		updateAnimPositionReadout(tween);
 		syncToPosition();
+		animController = undefined;
 	}
 
 	function play() {
@@ -2601,7 +2587,7 @@ function showBackgroundOptions() {
 			captureCanvas.width = videoWidth;
 			captureCanvas.height = videoHeight;
 			if (debug.video) {
-				canvas.style.display = 'none';
+				canvas.hidden = true;
 				document.body.appendChild(captureCanvas);
 			}
 			const scale = videoHeight / screen.height;
@@ -2634,8 +2620,12 @@ function showBackgroundOptions() {
 		videoQualityReadout.innerHTML = this.value + '%';
 	});
 
-	document.getElementById('btn-stop-video-render').addEventListener('click', function (event) {
-		animController.abort();
+	document.getElementById('btn-cancel-video').addEventListener('click', function (event) {
+		if (animController === undefined) {
+			$('#video-modal').modal('hide');
+		} else {
+			animController.abort();
+		}
 	});
 
 	document.getElementById('btn-download').addEventListener('click', function (event) {
