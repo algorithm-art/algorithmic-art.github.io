@@ -1,13 +1,13 @@
 'use strict';
-filePath = 'sketch/';
+filePath = document.location.origin + document.location.pathname + 'sketch/';
 const urlParameters = new URLSearchParams(document.location.search);
 let bgGenerator, generateBackground, setBgProperty, setBgPropertyElement;
 let random = new RandomNumberGenerator();
 const bgGeneratorImage = new Image();
 let backgroundImage;
 
-if (!window.debug) {
-	window.debug = {};
+if (!globalThis.debug) {
+	globalThis.debug = {};
 }
 debug.video = false;
 
@@ -517,7 +517,7 @@ try {
 			context.textBaseline = 'bottom';
 			const metrics = context.measureText(signatureText);
 			signatureWidth = 2 * 3 + Math.ceil(metrics.actualBoundingBoxRight);
-			signatureHeight = 2 * 4 + Math.ceil(metrics.actualBoundingBoxAscent);
+			signatureHeight = 4 + 1 + Math.ceil(metrics.actualBoundingBoxAscent);
 		}
 		signatureBox.style.width = signatureWidth + 'px';
 		signatureBox.style.height = signatureHeight + 'px';
@@ -564,13 +564,18 @@ try {
 		context.font = signatureFont.replace('20', fontSize);
 		const scaledWidth = signatureWidth / scale;
 		const scaledHeight = signatureHeight / scale;
+		const top = canvasHeight - scaledHeight;
 		const paddingX = Math.round(3 / scale);
 		const paddingY = Math.round(4 / scale);
-		context.fillStyle = rgba(meanRed, meanGreen, meanBlue, 1);
-		context.fillRect(0, canvasHeight - scaledHeight, scaledWidth, scaledHeight);
+		const onePx = 1 / scale;
+		const gradient = context.createLinearGradient(0, top, 0, top + paddingY);
+		gradient.addColorStop(0, rgba(meanRed, meanGreen, meanBlue, 0.2));
+		gradient.addColorStop(1, rgba(meanRed, meanGreen, meanBlue, 1));
+		context.fillStyle = gradient;
+		context.fillRect(0, top, scaledWidth, scaledHeight);
 		const luma = rgbToLuma(meanRed, meanGreen, meanBlue);
-		context.fillStyle = luma >= 0.5 ? 'black' : '#f0f0f0';
-		context.fillText(signatureText, paddingX, canvasHeight - paddingY);
+		context.fillStyle = luma >= 0.5 ? 'black' : '#eee';
+		context.fillText(signatureText, paddingX, canvasHeight - onePx);
 	}
 
 	function progressiveBackgroundDraw(generator, contextualInfo, width, height, preview) {
@@ -649,7 +654,7 @@ try {
 	let helpContext = false;
 	let helpContextIntermediate = false; // True after mouse down but before mouse click.
 
-	window.inHelpContext = function () {
+	globalThis.inHelpContext = function () {
 		return helpContext;
 	};
 
@@ -663,6 +668,9 @@ try {
 	const errorAlert = $('#error-alert');
 	const successAlert = $('#success-alert');
 	const videoErrorAlert = $('#video-error');
+	videoErrorAlert.on('closed.bs.alert', function (event) {
+		this.hidden = true;
+	});
 
 	const authorForm = document.getElementById('author-form');
 	const authorInput = document.getElementById('author');
@@ -1153,7 +1161,7 @@ try {
 			}
 		}
 	}
-	window.findMissingHelp = findMissingHelp;
+	globalThis.findMissingHelp = findMissingHelp;
 
 	function loadFailure() {
 		if (bgGenerator === undefined) {
@@ -1175,7 +1183,7 @@ try {
 		// Switch generator
 		let gen;
 		try {
-			const resolvedURL = /^http(s)?:/.test(url) ? url : '/sketch/' + url;
+			const resolvedURL = /^(\w+:)?\//.test(url) ? url : filePath + url;
 			const genModule = await import(resolvedURL)
 			const constructor = genModule.default;
 			gen = new constructor();
@@ -1233,6 +1241,12 @@ try {
 		if (optionsDoc !== undefined) {
 			for (let resetButton of optionsDoc.querySelectorAll('button[data-reset]')) {
 				resetButton.addEventListener('click', resetControl);
+			}
+			const baseElem = document.createElement('BASE');
+			baseElem.href = filePath;
+			optionsDoc.head.prepend(baseElem);
+			for (let img of optionsDoc.getElementsByTagName('IMG')) {
+				img.src = img.src;
 			}
 			container.append(...optionsDoc.body.children);
 			const imageCtrlLocation = container.querySelector('[data-attach=image]');
@@ -1440,7 +1454,8 @@ try {
 			nextStep();
 		}
 
-		const sketchFile = await downloadFile('/sketches.json', 'json');
+		const sketchesURL = document.location.origin + document.location.pathname + 'sketches.json';
+		const sketchFile = await downloadFile(sketchesURL, 'json');
 		for (let sketch of sketchFile.sketches) {
 			addSketch(sketch);
 			if (sketch.url === firstGenURL) {
@@ -1448,12 +1463,8 @@ try {
 			}
 		}
 
-		if (!firstDocID) {
-			if (firstGenURL) {
-				switchGenerator(firstGenURL, false);
-			} else {
-				$('#sketches-modal').modal('show');
-			}
+		if (!firstDocID && firstGenURL) {
+			switchGenerator(firstGenURL, false);
 		}
 	}
 	init();
@@ -1508,7 +1519,7 @@ try {
 				tweened[i] = (componentEnd - componentStart) * tween + componentStart;
 			}
 			if (colorSystem === 'rgb') {
-				return 'rgba(' + tweened.join(',') + ')';
+				return 'rgba(' + tweened.join(', ') + ')';
 			} else {
 				return hsla(...tweened);
 			}
@@ -1915,8 +1926,8 @@ try {
 					progressBar.innerHTML = percent + '%';
 					progressBar.setAttribute('aria-valuenow', percent);
 					framesRendered++;
-					const iconFile = framesRendered % 2 === 0 ? 'record.png' : 'draw_ellipse.png';
-					indicator.src = 'img/' + iconFile;
+					const iconFile = framesRendered % 2 === 0 ? 'img/record.png' : 'img/draw_ellipse.png';
+					indicator.src = iconFile;
 				} else if (animControlsOpen && tween - lastUIUpdate >= uiUpdateInterval) {
 					animPositionSlider.value = tween;
 					lastUIUpdate = tween;
@@ -1947,7 +1958,13 @@ try {
 		const progressRow = document.getElementById('video-progress-row');
 		progressRow.classList.remove('invisible');
 
-		await requireScript('lib/CCapture.all.min.js');
+		const downloads =  [requireScript('lib/CCapture.webm.min.js')];
+		const format = properties.format;
+		if (format === 'png' || format === 'jpg') {
+			downloads.push(requireScript('lib/tar.min.js'));
+		}
+		await Promise.all(downloads);
+
 		const capturer = new CCapture(properties);
 		animController = animate(bgGenerator, contextualInfo, width, height, startTween, length, loopAnim, capturer);
 		const stopButton = document.getElementById('btn-cancel-video');
@@ -2429,7 +2446,7 @@ try {
 	}
 
 	const noAnimErrorMsg = `
-		<p>The start and end frames are the same so there's nothing to animate. Use the
+		<p>The start and end frames are the same so there is nothing to animate. Use the
 		<span class="btn btn-sm btn-black"><img src="img/timeline_marker_start.png" alt="Start Frame" width="16" height="16"></span> and
 		<span class="btn btn-sm btn-black"><img src="img/timeline_marker_end.png" alt="Start Frame" width="16" height="16"></span>
 		buttons to set up animation frames.</p>
@@ -2609,7 +2626,7 @@ try {
 			$('#video-modal').modal('show');
 			return;
 		}
-		requireScript('lib/CCapture.all.min.js');
+		requireScript('lib/CCapture.webm.min.js');
 
 		let unsavedChanges = !currentFrame.isCurrentFrame();
 		const separateFrames = startFrame !== endFrame || ('tween' in bgGenerator);
@@ -2630,6 +2647,17 @@ try {
 			$('#video-modal').modal('show');
 		}
 	});
+
+	function loadCodecOnDemand(event) {
+		const format = this.value;
+		if (format === 'png' || format === 'jpg') {
+			requireScript('lib/tar.min.js');
+			document.getElementById('video-format').removeEventListener('input', loadCodecOnDemand);
+			loadCodecOnDemand = undefined;
+		}
+	}
+
+	document.getElementById('video-format').addEventListener('input', loadCodecOnDemand);
 
 	document.getElementById('btn-render-video').addEventListener('click', async function (event) {
 		let errorMsg = '';
@@ -2660,9 +2688,8 @@ try {
 				framerate: framerate,
 				motionBlurFrames: motionBlur,
 				format: document.getElementById('video-format').value,
-				quality: parseInt(document.getElementById('video-quality').value),
+				quality: Math.min(parseInt(document.getElementById('video-quality').value), 0.99999),
 				name: generateFilename(),
-				workersPath: 'lib/'
 			};
 			const startTween = startTime / length;
 
@@ -2687,6 +2714,7 @@ try {
 
 			const element = videoErrorAlert.get(0);
 			element.innerHTML = errorMsg;
+			element.hidden = false;
 			element.classList.add('show');
 			document.getElementById('video-modal-body').appendChild(element);
 

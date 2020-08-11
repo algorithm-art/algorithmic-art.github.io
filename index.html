@@ -3,20 +3,21 @@
 <head>
 	<title>Mathematical Art with Elizabeth</title>
 	<meta property="og:title" content="Mathematical Art with Elizabeth">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:*; img-src 'self' http://localhost:* blob:; script-src 'self' http://localhost:* cdn.jsdelivr.net/npm/popper.js@1.16.1/ code.jquery.com stackpath.bootstrapcdn.com; style-src 'self' http://localhost:* stackpath.bootstrapcdn.com 'unsafe-inline'; form-action 'self'; frame-src 'none'; object-src 'none'">
 
 	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.1/css/bootstrap.min.css" integrity="sha384-VCmXjywReHh4PwowAiWNagnWcLhlEJLA5buUprzK8rxFgeH0kww/aWY76TfkUoSX" crossorigin="anonymous">
 	<link rel="stylesheet" href="css/math-art.css">
 	<link rel="stylesheet" href="css/dark-mode.css" media="(prefers-color-scheme: dark)">
 
 	<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous" defer></script>
-	<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous" defer></script>
+	<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
 	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.1/js/bootstrap.min.js" integrity="sha384-XEerZL0cuoUbHE4nZReLT7nx9gQrQreJekYhJD9WNWhH8nEW+0c5qq7aIo2Wl30J" crossorigin="anonymous" defer></script>
 
 	<script src="js/util.js" defer></script>
 	<script src="js/math-art.js" defer></script>
 
-	<link rel="preload" as="style" href="fonts/pacifico.css" onload="this.onload=null;this.rel='stylesheet'">
-	<link rel="preload" as="style" href="fonts/america.css" onload="this.onload=null;this.rel='stylesheet'">
+	<link rel="preload" as="style" href="fonts/pacifico.css">
+	<link rel="preload" as="style" href="fonts/america.css">
 	<link rel="preload" as="fetch" href="sketches.json" crossorigin>
 	<link rel="icon" href="img/spirograph.png">
 
@@ -478,7 +479,7 @@
 						Resolution
 					</label>
 					<div class="col-5">
-						<select class="form-control-sm w-100" id="video-resolution">
+						<select class="form-control form-control-sm w-100" id="video-resolution">
 							<option value="640x360">360p</option>
 							<option value="854x480">480p</option>
 							<option value="1280x720">720p</option>
@@ -519,14 +520,13 @@
 				<div class="form-row form-group">
 					<div class="col-1"></div>
 					<label class="col-3 col-form-label col-form-label-sm" for="video-format">
-						Output
+						Format
 					</label>
 					<div class="col-5">
 						<select class="form-control form-control-sm" id="video-format">
 							<option value="webm" selected>WebM Video</option>
-							<option value="gif">Animated GIF</option>
-							<option value="png">PNG Stills</option>
-							<option value="jpg">JPEG Stills</option>
+							<option value="png">PNG Images</option>
+							<option value="jpg">JPEG Images</option>
 						</select>
 					</div>
 				</div>
@@ -536,10 +536,10 @@
 						Quality
 					</label>
 					<div class="col-4">
-						<input type="range" min="0" max="100" value="70" class="form-control-range mt-2" id="video-quality" aria-describedby="video-quality-readout">
+						<input type="range" min="0" max="100" value="85" class="form-control-range mt-2" id="video-quality" aria-describedby="video-quality-readout">
 					</div>
 					<div class="col-1">
-						<output id="video-quality-readout" class="small">70%</output>
+						<output id="video-quality-readout" class="small">85%</output>
 					</div>
 				</div>
 				<div class="form-row form-group">
@@ -580,11 +580,16 @@
 					</div>
 					<div class="col-8">
 						<div class="progress bg-dark" style="height: 20px">
-						  <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0; transition: unset" id="video-progress">0%</div>
+						  <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0; transition: unset" id="video-progress">0%</div>
 						</div>
 					</div>
 				</div>
-				<div class="alert alert-danger fade" id="video-error"></div>
+				<div class="pl-1">
+					<small class="form-text text-muted">
+						Switching to another browser tab will pause video rendering.
+					</small>
+				</div>
+				<div class="alert alert-danger fade" id="video-error" hidden></div>
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn btn-secondary" id="btn-cancel-video">

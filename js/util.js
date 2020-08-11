@@ -1,5 +1,12 @@
 'use strict';
 
+for (let preload of document.head.querySelectorAll('link[rel="preload"][as="style"]')) {
+	const link = document.createElement('LINK');
+	link.rel = 'stylesheet';
+	link.href = preload.href;
+	document.head.appendChild(link);
+}
+
 class AnimationController {
 	static Status = Object.freeze({
 		RUNNING: 1,
@@ -73,7 +80,7 @@ function requireScript(src) {
 let filePath = new URL('.', document.location);
 
 function downloadFile(url, type) {
-	const resolvedURL = /^((http(s)?:)|\/)/.test(url) ? url : filePath + url;
+	const resolvedURL = /^(\w+:)?\//.test(url) ? url : filePath + url;
 	return new Promise(function (resolve, reject) {
 		const request = new XMLHttpRequest();
 		request.open("GET", resolvedURL);
@@ -93,7 +100,7 @@ function downloadFile(url, type) {
 }
 
 function darkMode() {
-	return window.matchMedia('(prefers-color-scheme: dark)').matches;
+	return matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
 function focusFirst() {
@@ -348,52 +355,6 @@ function srgbToLAB(r, g, b, alpha) {
 	b = 200 * (fy - f(z / zn));
 
 	return [l, a ,b, alpha];
-}
-
-function parseFraction(text) {
-	const numerator = parseFloat(text);
-	let denominator = 1;
-	const slashPosition = text.indexOf('/');
-	if (slashPosition !== -1) {
-		denominator = parseFloat(text.slice(slashPosition + 1));
-	}
-	return numerator / denominator;
-}
-
-function parseLineDash(str) {
-	const lengthStrs = str.split(',');
-	let numValues = lengthStrs.length;
-	let lineDash = new Array(numValues);
-	for (let i = 0; i < numValues; i++) {
-		lineDash[i] = parseInt(lengthStrs[i]);
-	}
-	if (numValues === 1) {
-		if (lineDash[0] === 1) {
-			lineDash = [1, 0];
-		} else {
-			lineDash[1] = lineDash[0];
-		}
-	} else if (numValues % 2 === 1) {
-		for (let i = numValues - 2; i > 0; i--) {
-			lineDash.push(lineDash[i]);
-		}
-	}
-	return lineDash;
-}
-
-function adjustLineDash(lineDash, lineWidth) {
-	const numValues = lineDash.length;
-	for (let i = 0; i < numValues; i += 2) {
-		lineDash[i] -= lineWidth;
-		if (lineDash[i] < 1) {
-			lineDash[i] = 1;
-		}
-	}
-	for (let i = 1; i < numValues; i += 2) {
-		if (lineDash[i] > 0) {
-			lineDash[i] += lineWidth;
-		}
-	}
 }
 
 function idToProperty(id, hasPrefix) {
