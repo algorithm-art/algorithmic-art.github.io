@@ -1947,7 +1947,7 @@ try {
 		return newAnimController;
 	}
 
-	async function captureVideo(contextualInfo, width, height, startTween, length, properties) {
+	async function captureVideo(contextualInfo, width, height, length, properties) {
 		const renderButton = document.getElementById('btn-render-video');
 		renderButton.disabled = true;
 		const closeWidget = document.getElementById('video-modal').querySelector('.close');
@@ -1959,14 +1959,13 @@ try {
 		progressRow.classList.remove('invisible');
 
 		const downloads =  [requireScript('lib/CCapture.webm.min.js')];
-		const format = properties.format;
-		if (format === 'png' || format === 'jpg') {
+		if (properties.format !== 'webm') {
 			downloads.push(requireScript('lib/tar.min.js'));
 		}
 		await Promise.all(downloads);
 
 		const capturer = new CCapture(properties);
-		animController = animate(bgGenerator, contextualInfo, width, height, startTween, length, loopAnim, capturer);
+		animController = animate(bgGenerator, contextualInfo, width, height, 0, length, loopAnim, capturer);
 		const stopButton = document.getElementById('btn-cancel-video');
 		stopButton.innerHTML = 'Abort';
 		stopButton.classList.add('btn-danger');
@@ -2648,13 +2647,11 @@ try {
 		}
 	});
 
+
 	function loadCodecOnDemand(event) {
-		const format = this.value;
-		if (format === 'png' || format === 'jpg') {
-			requireScript('lib/tar.min.js');
-			document.getElementById('video-format').removeEventListener('input', loadCodecOnDemand);
-			loadCodecOnDemand = undefined;
-		}
+		requireScript('lib/tar.min.js');
+		document.getElementById('video-format').removeEventListener('input', loadCodecOnDemand);
+		loadCodecOnDemand = undefined;
 	}
 
 	document.getElementById('video-format').addEventListener('input', loadCodecOnDemand);
@@ -2676,10 +2673,6 @@ try {
 		if (!(motionBlur >= 1)) {
 			errorMsg += '<p>Invalid number of motion blur frames.</p>';
 		}
-		const startTime = parseFloat(document.getElementById('video-start').value);
-		if (!(startTime >= 0 && startTime < length)) {
-			errorMsg += '<p>Invalid start time.</p>';
-		}
 
 		if (errorMsg === '') {
 
@@ -2688,10 +2681,10 @@ try {
 				framerate: framerate,
 				motionBlurFrames: motionBlur,
 				format: document.getElementById('video-format').value,
-				quality: Math.min(parseInt(document.getElementById('video-quality').value), 0.99999),
+				quality: parseInt(document.getElementById('video-quality').value),
 				name: generateFilename(),
+				workersPath: 'lib/',
 			};
-			const startTween = startTime / length;
 
 			const resolutionStr = videoResolutionInput.value;
 			const videoWidth = parseInt(resolutionStr);
@@ -2708,7 +2701,7 @@ try {
 			const drawHeight = screen.height;
 			const contextualInfo = new DrawingContext(captureCanvas, videoWidth, videoHeight, scale);
 			contextualInfo.initializeShader(bgGenerator);
-			captureVideo(contextualInfo, drawWidth, drawHeight, startTween, length * 1000, properties);
+			captureVideo(contextualInfo, drawWidth, drawHeight, length * 1000, properties);
 
 		} else {
 
@@ -2725,7 +2718,7 @@ try {
 
 	document.getElementById('video-format').addEventListener('input', function (event) {
 		const qualitySlider = document.getElementById('video-quality');
-		const lossy = this.value === 'webm' || this.value === 'jpg';
+		const lossy = this.value !== 'png';
 		qualitySlider.disabled = !lossy;
 		videoQualityReadout.innerHTML = lossy ? qualitySlider.value + '%' : 'N/A';
 	});
