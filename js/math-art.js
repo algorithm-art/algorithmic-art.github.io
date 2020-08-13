@@ -10,6 +10,7 @@ if (!globalThis.debug) {
 	globalThis.debug = {};
 }
 debug.video = false;
+debug.help = document.location.hostname === 'localhost';
 
 let store;
 try {
@@ -28,6 +29,13 @@ try {
 
 	let backgroundRedraw;
 	let rotation = 0, opacity = 1;
+
+	const ScaleMode = Object.freeze({
+		CONTAIN: 0,
+		VIEWPORT: 1,
+		COVER: 2,
+	});
+	let scale = 1, scaleMode = ScaleMode.VIEWPORT, blur = 0.4;
 
 	const canvas = document.getElementById('background-canvas');
 
@@ -618,10 +626,51 @@ try {
 		}
 	}
 
-	function rotateCanvas(context, width, height, rotation) {
+	function calcSize(width, height, scale, scaleMode) {
+		let scaledWidth, scaledHeight;
+		if (scale === 0) {
+			scaledWidth = 1;
+			scaledHeight = 1;
+		} else {
+			if (scaleMode === ScaleMode.VIEWPORT) {
+				scaledWidth = width;
+				scaledHeight = height;
+			} else {
+				let length;
+				if (scaleMode === ScaleMode.CONTAIN) {
+					length = Math.min(width, height) / Math.SQRT2;
+				} else {
+					/* This equation looks good: length = (width + height) / Math.SQRT2
+					 * Length to completely fill the screen = Math.hypot(width, height)
+					 */
+					length = Math.hypot(width, height);
+				}
+				scaledWidth = length;
+				scaledHeight = length;
+			}
+			scaledWidth = Math.ceil(scaledWidth * scale);
+			scaledHeight = Math.ceil(scaledHeight * scale);
+		}
+		return [scaledWidth, scaledHeight];
+	}
+
+	function calcBlur(value) {
+		if (value < 0.5) {
+			// Compress 0 to 0.5 into 0.4 to 0.5
+			value = (value - 0.4) * 5;
+		}
+		if (value === 0) {
+			return '';
+		} else {
+			return 'blur(' + value + 'px)';
+		}
+	}
+
+
+	function transformCanvas(context, width, height, renderWidth, renderHeight, rotation) {
 		context.translate(width / 2, height / 2);
 		context.rotate(rotation);
-		context.translate(-width / 2, -height / 2);
+		context.translate(-renderWidth / 2, -renderHeight / 2);
 	}
 
 	function progressiveBackgroundGen(preview) {
@@ -631,12 +680,15 @@ try {
 		context.restore();
 		context.clearRect(0, 0, width, height);
 		context.save();
+
 		if (backgroundImage !== undefined) {
 			context.drawImage(backgroundImage, 0, 0, width, height);
 		}
-		rotateCanvas(context, width, height, rotation);
+
+		const [scaledWidth, scaledHeight] = calcSize(width, height, scale, scaleMode);
+		transformCanvas(context, width, height, scaledWidth, scaledHeight, rotation);
 		context.globalAlpha = opacity;
-		progressiveBackgroundDraw(bgGenerator, drawingContext, width, height, preview);
+		progressiveBackgroundDraw(bgGenerator, drawingContext, scaledWidth, scaledHeight, preview);
 	}
 
 	generateBackground = progressiveBackgroundGen;
@@ -680,6 +732,8 @@ try {
 	const modalHeader = document.getElementById('background-gen-modal-header');
 	const rotationSlider = document.getElementById('layer-rotation');
 	const opacitySlider = document.getElementById('layer-opacity');
+	const scaleSlider = document.getElementById('layer-scale');
+	const blurSlider = document.getElementById('layer-blur');
 	const toolbar = document.getElementById('toolbar');
 	const seedForm = document.getElementById('random-seed-form');
 	const seedInput = document.getElementById('random-seed');
@@ -701,10 +755,13 @@ try {
 			this.pairedStepped = new Map();
 			if (arguments.length === 0) {
 				// Used by the fromObject method
-				this.rotation = 0;
-				this.opacity = 1;
 				this.backgroundColor = '#ffffff';
 				this.backgroundImage = undefined;
+				this.opacity = 1;
+				this.rotation = 0;
+				this.scale = 1;
+				this.scaleMode = ScaleMode.VIEWPORT;
+				this.blur = 0.4;
 				this.random = random;
 				return;
 			}
@@ -753,10 +810,13 @@ try {
 					}
 				}
 			}
-			this.rotation = rotation;
-			this.opacity = opacity;
 			this.backgroundColor = backgroundElement.style.backgroundColor;
 			this.backgroundImage = backgroundImage;
+			this.opacity = opacity;
+			this.rotation = rotation;
+			this.scale = scale;
+			this.scaleMode = scaleMode;
+			this.blur = blur;
 			this.random = random;
 		}
 
@@ -773,12 +833,15 @@ try {
 			}
 			const data = {};
 			data.properties = properties;
-			data.rotation = this.rotation;
-			data.opacity = this.opacity;
 			data.backgroundColor = this.backgroundColor;
 			if (this.backgroundImage !== undefined) {
 				data.backgroundImageURL = this.backgroundImage.src;
 			}
+			data.opacity = this.opacity;
+			data.rotation = this.rotation;
+			data.scale = this.scale;
+			data.scaleMode = this.scaleMode;
+			data.blur = this.blur;
 			if (hasRandomness) {
 				data.seed = this.random.seed;
 			}
@@ -822,13 +885,17 @@ try {
 					}
 				}
 			}
-			frame.rotation = data.rotation;
 			frame.backgroundColor = data.backgroundColor;
 			if ('backgroundImageURL' in data) {
 				const image = new Image();
 				image.src = data.backgroundImageURL;
 				frame.backgroundImage = image;
 			}
+			frame.rotation = data.rotation;
+			frame.opacity = data.opacity;
+			frame.scale = data.scale;
+			frame.scaleMode = data.scaleMode;
+			frame.blur = data.blur;
 			if ('seed' in data) {
 				frame.random = new RandomNumberGenerator(data.seed);
 			}
@@ -837,16 +904,21 @@ try {
 
 		isCurrentFrame() {
 			if (
-				this.rotation !== rotation ||
 				this.backgroundColor !== backgroundElement.style.backgroundColor ||
-				this.backgroundImage?.src !== backgroundImage?.src
+				this.backgroundImage?.src !== backgroundImage?.src ||
+				this.rotation !== rotation ||
+				this.opacity !== opacity ||
+				this.scale !== scale ||
+				this.scaleMode !== scaleMode ||
+				this.blur !== blur
 			) {
 				return false;
 			}
+			const currentSeed = random.seed;
 			if (
-				this.random.seed !== random.seed &&
-				this.random.startGenerator.seed !== random.seed &&
-				this.random.endGenerator.seed !== random.seed
+				this.random.seed !== currentSeed &&
+				this.random.startGenerator.seed !== currentSeed &&
+				this.random.endGenerator.seed !== currentSeed
 			) {
 				return false;
 			}
@@ -1112,7 +1184,7 @@ try {
 		const ancestorIDs = new Map();
 		for (let element of container.querySelectorAll('input, button')) {
 			let id = element.id;
-			if (id === 'background-gen-image-upload') {
+			if (id === 'background-gen-image-upload' || ('reset' in element.dataset)) {
 					continue;
 			}
 			const tagName = element.tagName.toLowerCase();
@@ -1216,9 +1288,19 @@ try {
 			currentSketch = undefined;
 		}
 
-		// Initialize sketch
+		// Reset layer geometry
+		rotation = 0;
+		rotationSlider.value = 0;
+		scale = 1;
+		scaleSlider.value = 1;
+		scaleMode = ScaleMode.VIEWPORT;
+		document.getElementById('rotation-size-screen').checked = true;
+		blur = 0.4;
+		blurSlider.value = 0.4;
 		random = new RandomNumberGenerator();
 		seedInput.value = random.seed;
+
+		// Initialize sketch
 		currentFrame = currentFrameData();
 		startFrame = currentFrame;
 		endFrame = startFrame;
@@ -1230,8 +1312,8 @@ try {
 		const hasTween = 'tween' in gen;
 		if (hasTween) {
 			gen.tween = parseFloat(animPositionSlider.value);
-			tweenData = new TweenData(gen, startFrame, endFrame);
 		}
+		calcTweenData();
 		signatureChanged = true;
 		progressiveBackgroundGen(0);
 
@@ -1284,7 +1366,9 @@ try {
 				if (intro !== null) {
 					helpArea.appendChild(intro);
 				}
-				findBrokenHelp();
+				if (debug.help) {
+					findBrokenHelp();
+				}
 			} catch {
 				console.error('Unable to load help file.');
 			}
@@ -1316,9 +1400,8 @@ try {
 				} else {
 					endFrame = startFrame;
 				}
-				tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-				setWillChange();
-				renderFrame(bgGenerator, drawingContext, canvas.width, canvas.height, 0, loopAnim, false, 0);
+				calcTweenData();
+				progressiveBackgroundGen(0);
 				displaySeed();
 				animPositionSlider.value = 0;
 				updateAnimPositionReadout(0);
@@ -1338,6 +1421,7 @@ try {
 		repositionModal(false);
 		drawingContext.resize(window.innerWidth, window.innerHeight);
 		if (bgGenerator !== undefined) {
+			tweenData.calcSize(startFrame, endFrame, canvas.width, canvas.height);
 			progressiveBackgroundGen(0);
 		}
 	}
@@ -1678,10 +1762,15 @@ try {
 
 	class TweenData {
 
-		constructor(generator, startFrame, endFrame) {
+		constructor(generator, startFrame, endFrame, width, height) {
+
 			this.backgroundColorVaries =
 				startFrame.backgroundColor !== endFrame.backgroundColor &&
 				(startFrame.backgroundImage !== undefined || endFrame.backgroundImage !== undefined);
+
+			this.blurVaries = startFrame.blur !== endFrame.blur;
+
+			this.calcSize(startFrame, endFrame, width, height);
 
 			// Map x property name to the calculated value.
 			this.radii = new Map();
@@ -1720,6 +1809,11 @@ try {
 			}
 		}
 
+		calcSize(startFrame, endFrame, width, height) {
+			[this.startWidth, this.startHeight] = calcSize(width, height, startFrame.scale, startFrame.scaleMode);
+			[this.endWidth, this.endHeight] = calcSize(width, height, endFrame.scale, endFrame.scaleMode);
+		}
+
 		interpolateXY(keyX, tween) {
 			const r = this.radii.get(keyX);
 			const startTheta = this.startTheta.get(keyX);
@@ -1740,7 +1834,8 @@ try {
 
 	}
 
-	function setWillChange() {
+	function calcTweenData() {
+		tweenData = new TweenData(bgGenerator, startFrame, endFrame, canvas.width, canvas.height);
 		backgroundElement.style.willChange = tweenData.backgroundColorVaries ? 'background-color' : 'auto';
 	}
 
@@ -1783,7 +1878,7 @@ try {
 	const tempCanvas = document.createElement('CANVAS');
 	const tempContext = tempCanvas.getContext('2d');
 
-	function fillBackground(context, backgroundColor, width, height) {
+	function fillBackground(context, backgroundColor, filter, width, height) {
 		tempCanvas.width = context.canvas.width;
 		tempCanvas.height = context.canvas.height;
 		tempContext.drawImage(context.canvas, 0, 0);
@@ -1791,8 +1886,10 @@ try {
 		context.save();
 		context.fillStyle = backgroundColor;
 		context.fillRect(0, 0, width, height);
-		context.fillStyle = 'black';
+		context.filter = filter;
 		context.drawImage(tempCanvas, 0, 0, width, height);
+		context.fillStyle = 'black';
+		context.filter = '';
 	}
 
 	function renderFrame(generator, contextualInfo, width, height, tween, loop, paintBackground, preview) {
@@ -1861,7 +1958,9 @@ try {
 		context.clearRect(0, 0, width, height);
 		context.save();
 		interpolateBackgroundImage(startFrame.backgroundImage, endFrame.backgroundImage, context, tween, loop);
-		rotateCanvas(context, width, height, rotation);
+		const renderWidth = interpolateValue(tweenData.startWidth, tweenData.endWidth, tweenPrime, false);
+		const renderHeight = interpolateValue(tweenData.startHeight, tweenData.endHeight, tweenPrime, false);
+		transformCanvas(context, width, height, renderWidth, renderHeight, rotation);
 		context.globalAlpha = interpolateValue(startFrame.opacity, endFrame.opacity, tweenPrime, false);
 		if (generator.isShader) {
 			contextualInfo.setProperties(generator);
@@ -1870,21 +1969,25 @@ try {
 		} else if (preview === 0) {
 			// Draw everything in one go when capturing video
 			random.reset();
-			const redraw = generator.generate(context, width, height, 0);
+			const redraw = generator.generate(context, renderWidth, renderHeight, 0);
 			let done;
 			do {
 				done = redraw.next().done;
 			} while (!done);
 			drawSignature(contextualInfo);
 		} else {
-			progressiveBackgroundDraw(generator, contextualInfo, width, height, preview);
+			progressiveBackgroundDraw(generator, contextualInfo, renderWidth, renderHeight, preview);
 		}
+		const blur = interpolateValue(startFrame.blur, endFrame.blur, tweenPrime, false);
 		if (paintBackground) {
-			fillBackground(context, backgroundColor, width, height);
+			fillBackground(context, backgroundColor, calcBlur(blur), width, height);
+		} else if (tweenData.blurVaries) {
+			canvas.style.filter = calcBlur(blur);
 		}
 	}
 
 	function animate(generator, contextualInfo, width, height, startTween, length, loop, capturer) {
+		const canvas = contextualInfo.twoD.canvas;
 		const paintBackground = capturer !== undefined;
 		const newAnimController = new AnimationController({});
 		const promise = new Promise(function (resolve, reject) {
@@ -1919,7 +2022,7 @@ try {
 				newAnimController.progress = tween;
 
 				if (capturer !== undefined) {
-					capturer.capture(contextualInfo.twoD.canvas);
+					capturer.capture(canvas);
 					let percent = (tween - startTween) / (1 - startTween) * 100;
 					progressBar.style.width = percent + '%';
 					percent = Math.trunc(percent);
@@ -1972,6 +2075,7 @@ try {
 		stopButton.classList.remove('btn-secondary');
 
 		function reset() {
+			capturer.save();
 			capturer.stop();
 			stopButton.innerHTML = 'Close';
 			stopButton.classList.add('btn-secondary');
@@ -1987,7 +2091,6 @@ try {
 		}
 		animController.promise = animController.promise.then(
 			function () {
-				capturer.save();
 				$('#video-modal').modal('hide');
 				reset();
 			},
@@ -2064,6 +2167,7 @@ try {
 			let popoverContent = null;
 			document.body.classList.remove('context-help');
 			helpContext = false;
+
 			const rootElement = document.body;
 			do {
 				if (target.tagName === 'A') {
@@ -2071,6 +2175,12 @@ try {
 				}
 				if ('labels' in target && target.labels.length > 0) {
 					popoverTitle = target.labels[0].innerText;
+				} else if ('reset' in target.dataset) {
+					const resetTarget = document.getElementById(target.dataset.reset);
+					const resetLabel = resetTarget.labels[0].innerText;
+					popoverContent = 'Resets the ' + resetLabel + ' control to it\'s initial setting.';
+					popoverTitle = 'Reset ' + resetLabel;
+					break;
 				} else if (target.title) {
 					popoverTitle = target.title;
 				}
@@ -2095,19 +2205,13 @@ try {
 			} else {
 				if (target.type === 'radio') {
 					const groupNameWords = target.name.split('-');
-					for (let i = 0; i < groupNameWords.length; i++) {
-						const word = groupNameWords[i];
-						groupNameWords[i] = word[0].toUpperCase() + word.slice(1);
-					}
+					capitalize(groupNameWords);
 					popoverTitle = popoverTitle + ' ' + groupNameWords.join(' ');
 
 				} else if (popoverTitle === '') {
 
 					const groupNameWords = target.id.split('-').slice(1);
-					for (let i = 0; i < groupNameWords.length; i++) {
-						const word = groupNameWords[i];
-						groupNameWords[i] = word[0].toUpperCase() + word.slice(1);
-					}
+					capitalize(groupNameWords);
 					popoverTitle = groupNameWords.join(' ');
 				}
 			}
@@ -2219,6 +2323,33 @@ try {
 		progressiveBackgroundGen(0);
 	});
 
+	function setScaleMode(event) {
+		scaleMode = parseInt(this.value);
+		progressiveBackgroundGen(0);
+	}
+
+	for (let element of document.getElementById('rotation-sizing-row').getElementsByTagName('INPUT')) {
+		element.addEventListener('input', setScaleMode);
+	}
+
+	scaleSlider.addEventListener('input', function (event) {
+		scale = parseFloat(this.value);
+		progressiveBackgroundGen(1);
+	});
+
+	function scaleListener(event) {
+		scale = parseFloat(this.value);
+		progressiveBackgroundGen(0);
+	}
+
+	scaleSlider.addEventListener('pointerup', scaleListener);
+	scaleSlider.addEventListener('keyup', scaleListener);
+
+	blurSlider.addEventListener('input', function (event) {
+		blur = parseFloat(this.value);
+		canvas.style.filter = calcBlur(blur);
+	});
+
 	document.getElementById('btn-open-sketch').addEventListener('click', function (event) {
 		const sketchesModal = document.getElementById('sketches-modal');
 		$(sketchesModal).modal('hide');
@@ -2262,8 +2393,7 @@ try {
 					if (startFrame === endFrame) {
 						// Create start and end frames that differ only because they use different random numbers.
 						endFrame = currentFrameData();
-						tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-						setWillChange();
+						calcTweenData();
 					}
 					endFrame.random = endGenerator;
 					const tween = calcTween(parseFloat(animPositionSlider.value), loopAnim);
@@ -2308,8 +2438,7 @@ try {
 		random = random.startGenerator;
 		currentFrame = currentFrameData();
 		startFrame = currentFrame;
-		tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-		setWillChange();
+		calcTweenData();
 		displaySeed();
 		animPositionSlider.value = 0;
 		updateAnimPositionReadout(0);
@@ -2324,8 +2453,7 @@ try {
 	document.getElementById('btn-start-frame2').addEventListener('click', function (event) {
 		random = random.startGenerator;
 		startFrame = currentFrameData();
-		tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-		setWillChange();
+		calcTweenData();
 		displaySeed();
 		animAction();
 	});
@@ -2334,8 +2462,7 @@ try {
 		random = random.endGenerator;
 		currentFrame = currentFrameData();
 		endFrame = currentFrame;
-		tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-		setWillChange();
+		calcTweenData();
 		displaySeed();
 		animPositionSlider.value = 1;
 		updateAnimPositionReadout(1);
@@ -2350,8 +2477,7 @@ try {
 	document.getElementById('btn-end-frame2').addEventListener('click', function (event) {
 		random = random.endGenerator;
 		endFrame = currentFrameData();
-		tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-		setWillChange();
+		calcTweenData();
 		displaySeed();
 		animAction();
 	});
@@ -2366,7 +2492,7 @@ try {
 		currentFrame = currentFrameData();
 		startFrame = currentFrame;
 		endFrame = currentFrame;
-		tweenData = new TweenData(bgGenerator, startFrame, endFrame);
+		calcTweenData();
 		seedInput.value = random.seed;
 		showAlert(successAlert, 'Both frames set.', document.body);
 	});
@@ -2381,7 +2507,7 @@ try {
 		currentFrame = currentFrameData();
 		startFrame = currentFrame;
 		endFrame = currentFrame;
-		tweenData = new TweenData(bgGenerator, startFrame, endFrame);
+		calcTweenData();
 		seedInput.value = random.seed;
 		animAction();
 	});
@@ -2412,7 +2538,12 @@ try {
 
 	}
 
+	let modalsOpen;
+
 	function animFinished() {
+		for (let modal of modalsOpen) {
+			modal.modal('show');
+		}
 		const playStopButton = document.getElementById('btn-play');
 		playStopButton.children[0].src = 'img/control_play_blue.png';
 		playStopButton.title = 'Play animation';
@@ -2424,7 +2555,19 @@ try {
 	}
 
 	function play() {
-		$(modal).modal('hide');
+		modalsOpen = [];
+		const modalJQ = $(modal);
+		if (modal.classList.contains('show')) {
+			modalsOpen[0] = modalJQ;
+			modalJQ.modal('hide');
+		}
+		const layersModal = document.getElementById('layers-modal');
+		const layersModalJQ = $(layersModal);
+		if (layersModal.classList.contains('show')) {
+			modalsOpen.push(layersModalJQ);
+			layersModalJQ.modal('hide');
+		}
+
 		const button = document.getElementById('btn-play');
 		button.children[0].src = 'img/control_stop_blue.png';
 		button.title = 'Stop animation';
@@ -2464,8 +2607,7 @@ try {
 			random = random.endGenerator;
 			currentFrame = currentFrameData();
 			endFrame = currentFrame;
-			tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-			setWillChange();
+			calcTweenData();
 			separateFrames = true;
 			unsavedChanges = false;
 		}
@@ -2509,8 +2651,7 @@ try {
 				random = random.endGenerator;
 				currentFrame = currentFrameData();
 				endFrame = currentFrame;
-				tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-				setWillChange();
+				calcTweenData();
 				separateFrames = true;
 				unsavedChanges = false;
 			}
@@ -2563,8 +2704,7 @@ try {
 				random = random.endGenerator;
 				currentFrame = currentFrameData();
 				endFrame = currentFrame;
-				tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-				setWillChange();
+				calcTweenData();
 			} else {
 				return;
 			}
@@ -2633,8 +2773,7 @@ try {
 			random = random.endGenerator;
 			currentFrame = currentFrameData();
 			endFrame = currentFrame;
-			tweenData = new TweenData(bgGenerator, startFrame, endFrame);
-			setWillChange();
+			calcTweenData();
 			unsavedChanges = false;
 		}
 		if (unsavedChanges) {
