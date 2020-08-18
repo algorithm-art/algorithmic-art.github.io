@@ -1,5 +1,5 @@
 'use strict';
-filePath = document.location.origin + document.location.pathname + 'sketch/';
+filePath = rootPath + 'sketch/';
 const urlParameters = new URLSearchParams(document.location.search);
 let bgGenerator, generateBackground, setBgProperty, setBgPropertyElement;
 let random = new RandomNumberGenerator();
@@ -1235,7 +1235,7 @@ try {
 	}
 	globalThis.findMissingHelp = findMissingHelp;
 
-	function loadFailure() {
+	function loadFailure(exception) {
 		if (bgGenerator === undefined) {
 			$('#sketches-modal').modal('show');
 		} else {
@@ -1243,6 +1243,7 @@ try {
 			document.getElementById('background-gen-modal-label').innerHTML = bgGenerator.title;
 		}
 		showAlert(errorAlert, 'The requested sketch could not be loaded.', document.body);
+		console.error(exception);
 	}
 
 	async function switchGenerator(url, pushToHistory) {
@@ -1259,8 +1260,8 @@ try {
 			const genModule = await import(resolvedURL)
 			const constructor = genModule.default;
 			gen = new constructor();
-		} catch {
-			loadFailure();
+		} catch (e) {
+			loadFailure(e);
 			return;
 		}
 		if (gen.isShader) {
@@ -1274,8 +1275,8 @@ try {
 					shaderDeclarations(gen) +
 					fragFileContent;
 				drawingContext.initializeShader(gen);
-			} catch {
-				loadFailure();
+			} catch (e) {
+				loadFailure(e);
 				return;
 			}
 			drawingContext.setProperties(gen);
@@ -1342,9 +1343,6 @@ try {
 		document.getElementById('btn-both-frames').hidden = !hasTween;
 		document.getElementById('btn-both-frames2').hidden = !hasTween;
 		toolbar.hidden = false;
-		for (let close of document.getElementById('sketches-modal').querySelectorAll('button[data-dismiss=modal]')) {
-			close.hidden = false;
-		}
 		if (pushToHistory) {
 			const name = url.slice(0, -3);	// trim .js
 			urlParameters.set('gen', name);
@@ -1352,6 +1350,11 @@ try {
 		}
 		titleBar.innerHTML = gen.title;
 		document.title = gen.title;
+		const sketchesModal = document.getElementById('sketches-modal');
+		for (let close of sketchesModal.querySelectorAll('button[data-dismiss=modal]')) {
+			close.hidden = false;
+		}
+		$(sketchesModal).modal({backdrop: true, keyboard: true, show: false});
 
 		// Load help file & display new sketch options
 		const helpArea = document.getElementById('help-sketch');
@@ -1459,6 +1462,10 @@ try {
 		foregroundModal = target;
 	}
 
+	function clickInWindow(event) {
+		windowToFront(this.parentElement.parentElement.parentElement);
+	}
+
 	function startWindowDrag(event) {
 		const target = event.target;
 		if (target === this || target.tagName === 'H6') {
@@ -1487,6 +1494,8 @@ try {
 		header.addEventListener('pointerdown', startWindowDrag);
 		header.addEventListener('pointerup', stopWindowDrag);
 		header.addEventListener('dblclick', collapseWindow);
+		const body = floating.querySelector('.modal-body');
+		body.addEventListener('click', clickInWindow);
 		const floatingJQ = $(floating);
 		floatingJQ.on('show.bs.modal', expandWindow);
 		floatingJQ.modal({focus: false, show: false});
@@ -1521,7 +1530,7 @@ try {
 		}
 		if (firstGenURL === null) {
 			nextStep = function () {
-				$(sketchesModal).modal('show');
+				$(sketchesModal).modal({backdrop: 'static', keyboard: false});
 			};
 		}
 
@@ -1538,8 +1547,7 @@ try {
 			nextStep();
 		}
 
-		const sketchesURL = document.location.origin + document.location.pathname + 'sketches.json';
-		const sketchFile = await downloadFile(sketchesURL, 'json');
+		const sketchFile = await downloadFile(rootPath + 'sketches.json', 'json');
 		for (let sketch of sketchFile.sketches) {
 			addSketch(sketch);
 			if (sketch.url === firstGenURL) {
@@ -1892,7 +1900,7 @@ try {
 		context.filter = '';
 	}
 
-	function renderFrame(generator, contextualInfo, width, height, tween, loop, paintBackground, preview) {
+	function renderFrame(generator, contextualInfo, width, height, tween, loop, paintBackground, preview, forAnim) {
 		const tweenPrime = calcTween(tween, loop);
 		for (let property of startFrame.continuous.keys()) {
 			const startValue = startFrame.continuous.get(property);
@@ -1965,16 +1973,14 @@ try {
 		if (generator.isShader) {
 			contextualInfo.setProperties(generator);
 			contextualInfo.drawGL(tweenPrime, preview);
-			drawSignature(contextualInfo);
-		} else if (preview === 0) {
+		} else if (forAnim) {
 			// Draw everything in one go when capturing video
 			random.reset();
-			const redraw = generator.generate(context, renderWidth, renderHeight, 0);
+			const redraw = generator.generate(context, renderWidth, renderHeight, preview);
 			let done;
 			do {
 				done = redraw.next().done;
 			} while (!done);
-			drawSignature(contextualInfo);
 		} else {
 			progressiveBackgroundDraw(generator, contextualInfo, renderWidth, renderHeight, preview);
 		}
@@ -1984,29 +1990,32 @@ try {
 		} else if (tweenData.blurVaries) {
 			canvas.style.filter = calcBlur(blur);
 		}
+		if (paintBackground || !forAnim) {
+			drawSignature(contextualInfo);
+		}
 	}
 
-	function animate(generator, contextualInfo, width, height, startTween, length, loop, capturer) {
+	function animate(generator, contextualInfo, width, height, startTween, length, loop, preview, capturer) {
 		const canvas = contextualInfo.twoD.canvas;
 		const paintBackground = capturer !== undefined;
-		const newAnimController = new AnimationController({});
+		const newAnimController = new AnimationController({startTween: startTween});
 		const promise = new Promise(function (resolve, reject) {
 			const indicator = document.getElementById('recording-indicator');
 			let framesRendered = 0;
-			let uiUpdateInterval = 2 / animPositionSlider.clientWidth;
+			let uiUpdateInterval = 1 / animPositionSlider.clientWidth;
 			if (!Number.isFinite(uiUpdateInterval)) {
-				uiUpdateInterval = 0.0065;
+				uiUpdateInterval = 1 / 30;
 			}
-			let lastUIUpdate;
 
 			function render(time) {
 				if (capturer !== undefined) {
 					time = performance.now();
 				}
+				const startTween = newAnimController.startTween;
 				let beginTime = newAnimController.beginTime;
 				if (beginTime === undefined) {
 					beginTime = time;
-					lastUIUpdate = startTween;
+					newAnimController.lastUIUpdate = startTween;
 					newAnimController.setup(render, reject, beginTime);
 				}
 
@@ -2018,7 +2027,7 @@ try {
 				if (lastFrame) {
 					tween = 1;
 				}
-				renderFrame(generator, contextualInfo, width, height, tween, loop, paintBackground, 0);
+				renderFrame(generator, contextualInfo, width, height, tween, loop, paintBackground, preview, !paintBackground);
 				newAnimController.progress = tween;
 
 				if (capturer !== undefined) {
@@ -2031,9 +2040,9 @@ try {
 					framesRendered++;
 					const iconFile = framesRendered % 2 === 0 ? 'img/record.png' : 'img/draw_ellipse.png';
 					indicator.src = iconFile;
-				} else if (animControlsOpen && tween - lastUIUpdate >= uiUpdateInterval) {
+				} else if (animControlsOpen && tween - newAnimController.lastUIUpdate >= uiUpdateInterval) {
 					animPositionSlider.value = tween;
-					lastUIUpdate = tween;
+					newAnimController.lastUIUpdate = tween;
 				}
 				if (lastFrame) {
 					newAnimController.finish(resolve);
@@ -2068,7 +2077,7 @@ try {
 		await Promise.all(downloads);
 
 		const capturer = new CCapture(properties);
-		animController = animate(bgGenerator, contextualInfo, width, height, 0, length, loopAnim, capturer);
+		animController = animate(bgGenerator, contextualInfo, width, height, 0, length, loopAnim, 0, capturer);
 		const stopButton = document.getElementById('btn-cancel-video');
 		stopButton.innerHTML = 'Abort';
 		stopButton.classList.add('btn-danger');
@@ -2355,7 +2364,12 @@ try {
 		$(sketchesModal).modal('hide');
 		$(modal).modal('show');
 		currentSketch = queryChecked(sketchesModal, 'sketch')._sketch;
-		switchGenerator(currentSketch.url, true);
+		const url = currentSketch.url;
+		if (/\.html$/.test(url)) {
+			document.location = new URL(url, document.location);
+		} else {
+			switchGenerator(currentSketch.url, true);
+		}
 	});
 
 	// Generate new background button.
@@ -2515,7 +2529,7 @@ try {
 	document.getElementById('btn-bg-change-discard').addEventListener('click', function (event) {
 		const tween = parseFloat(animPositionSlider.value);
 		random = interpolateRandom(startFrame.random, endFrame.random, calcTween(tween, loopAnim));
-		renderFrame(bgGenerator, drawingContext, canvas.width, canvas.height, tween, loopAnim, false, 0);
+		renderFrame(bgGenerator, drawingContext, canvas.width, canvas.height, tween, loopAnim, false, 0, false);
 		currentFrame = currentFrameData();
 		animAction();
 	});
@@ -2539,6 +2553,47 @@ try {
 	}
 
 	let modalsOpen;
+	let playPreview; // 1 = high performance, 0 = low detail mode, undefined = undecided
+
+	function setPlayPreview(event) {
+		playPreview = parseInt(this.value);
+		if (store !== undefined) {
+			store.setItem('play-preview', playPreview);
+		}
+		const playModeModal = document.getElementById('play-mode-modal');
+		if (playModeModal !== null && playModeModal.style.display !== 'block') {
+			playModeModal.remove();
+		}
+	}
+
+	for (let radio of document.getElementById('play-preview-row').querySelectorAll('input[name="play-preview"]')) {
+		radio.addEventListener('input', setPlayPreview);
+	}
+
+	if (store !== undefined) {
+		const value = parseInt(store.getItem('play-preview'));
+		if (value >= 0) {
+			playPreview = value;
+			const radioContainer = document.getElementById('play-preview-row');
+			checkInput(radioContainer, 'play-preview', playPreview);
+		}
+	}
+	if (playPreview === undefined) {
+		function setInitialPlayPreview(event) {
+			setPlayPreview.apply(this, [event]);
+			playPreview = parseInt(this.value);
+			const radioContainer = document.getElementById('play-preview-row');
+			checkInput(radioContainer, 'play-preview', playPreview);
+			play();
+		}
+
+		document.getElementById('btn-play-fast').addEventListener('click', setInitialPlayPreview);
+		document.getElementById('btn-play-detail').addEventListener('click', setInitialPlayPreview);
+
+		$('#play-mode-modal').on('hidden.bs.modal', function (event) {
+			this.remove();
+		});
+	}
 
 	function animFinished() {
 		for (let modal of modalsOpen) {
@@ -2550,11 +2605,20 @@ try {
 		const tween = animController.progress;
 		animPositionSlider.value = tween;
 		updateAnimPositionReadout(tween);
-		syncToPosition();
+		if (playPreview > 0) {
+			syncAndDraw();
+		} else {
+			syncToPosition();
+		}
 		animController = undefined;
 	}
 
 	function play() {
+		if (playPreview === undefined) {
+			$('#play-mode-modal').modal('show');
+			return;
+		}
+
 		modalsOpen = [];
 		const modalJQ = $(modal);
 		if (modal.classList.contains('show')) {
@@ -2582,7 +2646,7 @@ try {
 			}
 		}
 		const length = parseFloat(document.getElementById('anim-length').value) * 1000;
-		animController = animate(bgGenerator, drawingContext, canvas.width, canvas.height, start, length, loopAnim);
+		animController = animate(bgGenerator, drawingContext, canvas.width, canvas.height, start, length, loopAnim, playPreview);
 		animController.promise = animController.promise.then(animFinished, animFinished);
 		animController.start();
 	}
@@ -2644,6 +2708,14 @@ try {
 	 let seeking = false;
 
 	animPositionSlider.addEventListener('input', function (event) {
+		const tween = parseFloat(this.value);
+		if (animController !== undefined) {
+			animController.startTween = tween;
+			animController.lastUIUpdate = tween;
+			animController.beginTime = performance.now();
+			return;
+		}
+
 		if (!seeking) {
 			let unsavedChanges = !currentFrame.isCurrentFrame();
 			let separateFrames = startFrame !== endFrame || ('tween' in bgGenerator);
@@ -2666,8 +2738,7 @@ try {
 			}
 			seeking = true;
 		}
-		const tween = parseFloat(this.value);
-		renderFrame(bgGenerator, drawingContext, canvas.width, canvas.height, tween, loopAnim, false, 1);
+		renderFrame(bgGenerator, drawingContext, canvas.width, canvas.height, tween, loopAnim, false, 1, true);
 		updateAnimPositionReadout(tween);
 	});
 
@@ -2684,7 +2755,7 @@ try {
 
 	function renderAndSync() {
 		const tween = parseFloat(animPositionSlider.value);
-		renderFrame(bgGenerator, drawingContext, canvas.width, canvas.height, tween, loopAnim, false, 0);
+		renderFrame(bgGenerator, drawingContext, canvas.width, canvas.height, tween, loopAnim, false, 0, false);
 		updateAnimPositionReadout(tween);
 		syncToPosition();
 	}
@@ -2697,6 +2768,14 @@ try {
 
 	animPositionSlider.addEventListener('pointerup', syncAndDraw);
 	animPositionSlider.addEventListener('keyup', syncAndDraw);
+
+	document.getElementById('anim-length').addEventListener('input', function (event) {
+		const length = parseFloat(this.value);
+		if (length > 0) {
+			updateAnimPositionReadout(animPositionSlider.value);
+			videoErrorAlert.alert('close');
+		}
+	});
 
 	document.getElementById('btn-rewind').addEventListener('click', function (event) {
 		if (startFrame === endFrame) {
@@ -2711,14 +2790,6 @@ try {
 		}
 		animPositionSlider.value = 0;
 		renderAndSync();
-	});
-
-	document.getElementById('anim-length').addEventListener('input', function (event) {
-		const length = parseFloat(this.value);
-		if (length > 0) {
-			updateAnimPositionReadout(animPositionSlider.value);
-			videoErrorAlert.alert('close');
-		}
 	});
 
 	document.getElementById('btn-anim-opts').addEventListener('click', function (event) {
@@ -2987,5 +3058,17 @@ try {
 	});
 
 	clearComboboxesOnFocus();
+
+	function rightAlignDropdown(event) {
+		const menu = this.querySelector('.drop-align-right');
+		setTimeout(function () {
+			const height = Math.ceil(menu.clientHeight);
+			menu.style.transform = 'translate(1px, -' + height + 'px)';
+		}, 0);
+	}
+
+	for (let element of document.getElementsByClassName('drop-align-right')) {
+		$(element.parentElement).on('shown.bs.dropdown', rightAlignDropdown);
+	}
 
 }

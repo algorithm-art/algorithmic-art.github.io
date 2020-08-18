@@ -82,15 +82,11 @@ export default function SierpinskiCarpet() {
 			generateBackground(0);
 		});
 
-		optionsDoc.getElementById('carpet-blend-depth').addEventListener('input', function (event) {
+		const blendDepthInput = optionsDoc.getElementById('carpet-blend-depth');
+		blendDepthInput.addEventListener('input', function (event) {
 			const value = parseInt(this.value);
 			if (value >= 0) {
-				const oldValue = me.blendDepth;
-				const totalDepth = me.maxDepth;
 				me.blendDepth = value;
-				if (oldValue >= totalDepth && value >= totalDepth) {
-					return;
-				}
 				generateBackground(0);
 			}
 		});
@@ -228,38 +224,200 @@ export default function SierpinskiCarpet() {
 		lrCornerSlider.addEventListener('pointerup', fullRedraw);
 		lrCornerSlider.addEventListener('keyup', fullRedraw);
 
-		optionsDoc.getElementById('carpet-depth').addEventListener('input', function (event) {
+		$(optionsDoc.getElementById('carpet-structure-tab')).on('show.bs.tab', function (event) {
+			const hasMiddleX = me.middleWidth > 0;
+			const hasMiddleY = me.middleHeight > 0;
+			const numPieces = 5 + (hasMiddleX ? 2 : 0) + (hasMiddleY ? 2 : 0);
+			const button = layoutsDiv.querySelector(`input[name="carpet-layout"][value="${numPieces}"]`);
+			button.checked = true;
+			$(button.parentElement).button('toggle');
+		});
+
+		const maxDepthInput = optionsDoc.getElementById('carpet-depth');
+		const centreDepthInput = optionsDoc.getElementById('carpet-centre-depth');
+
+		function limitCentreDepth() {
+			const max = me.maxDepth;
+			const min = Math.min(max, 1);
+			me.centreDepth = Math.max(Math.min(me.centreDepth, max), Math.min(max, 2));
+			centreDepthInput.min = min;
+			centreDepthInput.max = max;
+			centreDepthInput.value = me.centreDepth;
+		}
+
+		maxDepthInput.addEventListener('input', function (event) {
 			const value = parseInt(this.value);
 			if (value >= 0) {
 				me.maxDepth = value;
+				limitCentreDepth();
 				generateBackground(0);
+				blendDepthInput.max = value;
 			}
 		});
+
+		const cutoutFields = optionsDoc.getElementById('carpet-cutouts');
+
+		function setCutoutVisibility() {
+			let hasCutouts = me.overlap > 0;
+			if (hasCutouts) {
+				const recursive = me.recursive;
+				hasCutouts =
+					!recursive[0] || !recursive[2] ||
+					!recursive[6] || !recursive[8];
+
+				if (me.middleWidth > 0 || me.middleHeight > 0) {
+					hasCutouts =
+						hasCutouts ||
+						!recursive[1] || !recursive[7] ||
+						!recursive[3] || !recursive[5]
+				}
+			}
+			cutoutFields.classList.toggle('show', hasCutouts);
+		}
 
 		const overlapInput = optionsDoc.getElementById('carpet-overlap');
 		overlapInput.addEventListener('input', function (event) {
 			me.overlap = parseFloat(this.value);
 			generateBackground(1);
 		});
-		overlapInput.addEventListener('pointerup', fullRedraw);
-		overlapInput.addEventListener('keyup', fullRedraw);
+		function applyOverlap() {
+			setCutoutVisibility();
+			fullRedraw();
+		}
+		overlapInput.addEventListener('pointerup', applyOverlap);
+		overlapInput.addEventListener('keyup', applyOverlap);
 
-		function updateCheckboxArray(i) {
-			return function (event) {
-				const property = this.dataset.property;
-				me[property][i] = this.checked;
-				generateBackground(0);
-			};
+		const middleWidthInput = optionsDoc.getElementById('carpet-middle-width');
+		const middleHeightInput = optionsDoc.getElementById('carpet-middle-height');
+
+		function calcComplexity() {
+			const hasMiddleX = me.middleWidth > 0;
+			const hasMiddleY = me.middleHeight > 0;
+			let numPieces = 0;
+			for (let i = 0; i < 9; i++) {
+				if (!me.recursive[i]) {
+					continue;
+				}
+				if (i === 4 && me.overlap > 0) {
+					numPieces++;
+					continue;
+				}
+				if (!hasMiddleX && i % 3 === 1) {
+					continue;
+				}
+				if (!hasMiddleY && i >= 3 && i <= 5) {
+					continue;
+				}
+				numPieces++;
+			}
+			return numPieces;
 		}
 
-		const recursiveInputs = optionsDoc.getElementById('carpet-recursive').querySelectorAll('input[data-property=recursive]');
+		function limitWork(currentComplexity) {
+			currentComplexity = Math.max(currentComplexity, 2);
+			const work = (currentComplexity ** me.maxDepth - 1) / (currentComplexity - 1);
+
+			const newComplexity = calcComplexity();
+			let newDepth = Math.round(
+				Math.log2(work * (newComplexity - 1) + 1) /
+				Math.log2(newComplexity)
+			);
+			newDepth = Math.max(newDepth, 5);
+
+			if (newDepth < me.maxDepth) {
+				me.maxDepth = newDepth;
+				maxDepthInput.value = newDepth;
+				limitCentreDepth();
+				if (me.blendDepth > newDepth) {
+					me.blendDepth = newDepth;
+					blendDepthInput.value = newDepth;
+				}
+				blendDepthInput.max = newDepth;
+			}
+		}
+
+		function selectLayout(event) {
+			const oldComplexity = calcComplexity();
+			const value = parseInt(this.value);
+			const hasMiddleX = value === 9;
+			const hasMiddleY = value >= 7;
+
+			if (!hasMiddleX) {
+				me.middleWidth = 0;
+			} else if (me.middleWidth === 0) {
+				me.middleWidth = 1;
+			}
+			middleWidthInput.value = me.middleWidth;
+
+			if (!hasMiddleY) {
+				me.middleHeight = 0;
+			} else if (me.middleHeight === 0) {
+				me.middleHeight = 1;
+			}
+			middleHeightInput.value = me.middleHeight;
+
+			if (value === 9) {
+				me.overlap = 0;
+			} else if (me.overlap === 0) {
+				me.overlap = 0.5;
+			}
+			overlapInput.value = me.overlap;
+			setCutoutVisibility();
+			limitWork(oldComplexity);
+			generateBackground(0);
+		}
+
+		const layoutsDiv = optionsDoc.getElementById('carpet-layouts')
+		for (let button of layoutsDiv.getElementsByTagName('INPUT')) {
+			button.addEventListener('click', selectLayout);
+		}
+
+		const recursiveInputs = Array.from(optionsDoc.getElementById('carpet-recursion').querySelectorAll('input[name="carpet-recursive"]'));
+
+		function changeRecursion(event) {
+			const index = recursiveInputs.indexOf(this);
+			const recurse = this.checked;
+			me.recursive[index] = recurse;
+			if (index === 4) {
+				const row = centreDepthInput.parentElement.parentElement;
+				row.classList.toggle('show', recurse);
+				if (recurse) {
+					const depth = Math.max(me.centreDepth, parseInt(centreDepthInput.value), 2);
+					me.centreDepth = depth;
+					centreDepthInput.value = depth;
+				} else {
+					me.centreDepth = 1;
+				}
+			}
+			setCutoutVisibility();
+			generateBackground(0);
+		}
+
 		for (let i = 0; i < recursiveInputs.length; i++) {
-			recursiveInputs[i].addEventListener('input', updateCheckboxArray(i));
+			recursiveInputs[i].addEventListener('input', changeRecursion);
 		}
 
-		const cutoutInputs = optionsDoc.getElementById('carpet-cutouts').querySelectorAll('input[data-property=cutouts]');
+		centreDepthInput.addEventListener('input', function (event) {
+			const value = parseInt(this.value);
+			if (value >= 0) {
+				me.centreDepth = value;
+				generateBackground(0);
+			}
+		});
+
+		const cutoutInputs = Array.from(cutoutFields.querySelectorAll('input[name="carpet-cutouts"]'));
+
+		function changeCutout(event) {
+			let index = cutoutInputs.indexOf(this);
+			if (index >= 4) {
+				index++;
+			}
+			me.cutouts[index] = this.checked;
+			generateBackground(0);
+		}
+
 		for (let i = 0; i < cutoutInputs.length; i++) {
-			cutoutInputs[i].addEventListener('input', updateCheckboxArray(i >= 4 ? i + 1 : i));
+			cutoutInputs[i].addEventListener('input', changeCutout);
 		}
 
 		optionsDoc.getElementById('carpet-cutout-depth').addEventListener('input', function (event) {
@@ -286,7 +444,6 @@ export default function SierpinskiCarpet() {
 		lopsidedYInput.addEventListener('pointerup', fullRedraw);
 		lopsidedYInput.addEventListener('keyup', fullRedraw);
 
-		const middleWidthInput = optionsDoc.getElementById('carpet-middle-width');
 		middleWidthInput.addEventListener('input', function (event) {
 			me.middleWidth = parseFloat(this.value);
 			generateBackground(1);
@@ -294,7 +451,6 @@ export default function SierpinskiCarpet() {
 		middleWidthInput.addEventListener('pointerup', fullRedraw);
 		middleWidthInput.addEventListener('keyup', fullRedraw);
 
-		const middleHeightInput = optionsDoc.getElementById('carpet-middle-height');
 		middleHeightInput.addEventListener('input', function (event) {
 			me.middleHeight = parseFloat(this.value);
 			generateBackground(1);
@@ -365,14 +521,16 @@ export default function SierpinskiCarpet() {
 	this.cutoutDepth = 1;
 
 	this.maxDepth = 5;
+	this.centreDepth = 1;
+	this.blendDepth = 4;
 	this.patternDepth = 3;
+
 	this.filling = 'b';
 	this.patternLocations = 3;
 	this.patternedCentre = true;
 	this.centreEmphasis = 0;
 
 	this.compositionOp = 'source-over';
-	this.blendDepth = 4;
 	this.blendFilling = true;
 	this.opacityEnable = 2;
 
@@ -392,7 +550,7 @@ SierpinskiCarpet.prototype.animatable = {
 		'colors', 'patternOpacities'
 	],
 	stepped: [
-		'recursive', 'cutouts', 'cutoutDepth', 'maxDepth',
+		'recursive', 'cutouts', 'cutoutDepth', 'maxDepth', 'centreDepth',
 		'patternDepth', 'compositionOp', 'blendDepth', 'filling', 'patternLocations',
 		'patternedCentre', 'centreEmphasis', 'blendFilling', 'opacityEnable',
 		'bipartite'
@@ -524,6 +682,7 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 	permutations[8] = [2, 5, 8, 1, 4, 7, 0, 3, 6];
 	permutations[12] = permutations[4];
 	const recursive = this.recursive;
+	recursive[4] = this.centreDepth > 1;
 	const cutouts = this.cutouts;
 	const cutoutDepth = this.cutoutDepth - 1;
 	const middleWidth = this.middleWidth / 3;
@@ -586,6 +745,7 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 	if (preview > 0 && maxDepth > 3) {
 		maxDepth = 3;
 	}
+	const centreDepth = Math.min(maxDepth, this.centreDepth - 1);
 
 	let applyOpacity = true;
 	const baseOpacity = context.globalAlpha;
@@ -782,7 +942,7 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 					}
 				}
 
-				if (!recursive[4] || depth === maxDepth) {
+				if (!recursive[4] || depth >= centreDepth) {
 					if (useCutouts && (!recursive[4] || maxDepth === 0)) {
 						context.clip(clipPath);
 					}
