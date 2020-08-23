@@ -284,6 +284,7 @@ try {
 			this.twoD = twoD;
 			this.gl = undefined;
 			this.scale = scale;
+			this.twoDMatrixInv = new DOMMatrix([scale, 0, 0, scale, 0, 0]);
 			this.resize(width, height);
 			this.modelViewMatrix = undefined;
 			this.projectionMatrix = undefined;
@@ -330,6 +331,19 @@ try {
 					gl.uniform1f(uniformLocations.height, glCanvas.height);
 				}
 			}
+        }
+
+        save2DMatrix() {
+        	const matrix = this.twoD.getTransform();
+        	matrix.invertSelf();
+        	this.twoDMatrixInv = matrix;
+        }
+
+        transform2DPoint(x, y) {
+        	const matrix = this.twoDMatrixInv;
+			const transformedX = Math.round(matrix.a * x + matrix.c * y + matrix.e);
+			const transformedY = Math.round(matrix.b * x + matrix.d * y + matrix.f);
+			return [transformedX, transformedY];
         }
 
 		initializeShader(generator) {
@@ -534,6 +548,7 @@ try {
 
 	function drawSignature(contextualInfo) {
 		const context = contextualInfo.twoD;
+		contextualInfo.save2DMatrix();
 		if (signatureChanged) {
 			calcSignature();
 		} else {
@@ -1241,9 +1256,13 @@ try {
 		}
 		const x = event.clientX;
 		const y = event.clientY;
-		const transformedX = matrix.a * x + matrix.c * y + matrix.e;
-		const transformedY = matrix.b * x + matrix.d * y + matrix.f;
-		bgGenerator.onclick(transformedX, transformedY);
+		const [transformedX, transformedY] = drawingContext.transform2DPoint(x, y);
+
+		const context = drawingContext.twoD;
+		const width = canvas.width;
+		const height = canvas.height;
+		const [scaledWidth, scaledHeight] = calcSize(width, height, scale, scaleMode);
+		bgGenerator.onclick(transformedX, transformedY, scaledWidth, scaledHeight);
 	}
 
 	function loadFailure(exception) {
@@ -1536,7 +1555,7 @@ try {
 	}
 
 	function collapseWindow(event) {
-		$(this.parentElement.querySelector('.modal-body')).collapse('toggle');
+		$(this.parentElement.parentElement.querySelector('.modal-body')).collapse('toggle');
 	}
 
 	function expandWindow(event) {
@@ -1548,7 +1567,7 @@ try {
 		const header = floating.querySelector('.modal-header');
 		header.addEventListener('pointerdown', startWindowDrag);
 		header.addEventListener('pointerup', stopWindowDrag);
-		header.addEventListener('dblclick', collapseWindow);
+		header.querySelector('.collapse-gadget').addEventListener('click', collapseWindow);
 		const body = floating.querySelector('.modal-body');
 		body.addEventListener('click', clickInWindow);
 		const floatingJQ = $(floating);
