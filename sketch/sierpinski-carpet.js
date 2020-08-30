@@ -1,7 +1,6 @@
 export default function SierpinskiCarpet() {
 	const me = this;
 	this.title = 'Sierpinski Carpet';
-	this.hasRandomness = false;
 	this.helpFile = 'help/sierpinski-carpet.html';
 
 	/*
@@ -688,7 +687,6 @@ class Tile {
 }
 
 SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHeight, preview) {
-	let beginTime = performance.now();
 	const stretch = this.stretch;
 	if (stretch === -1) {
 		return;
@@ -762,7 +760,6 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 	context.save();
 
 	let queue = [new Tile(0, 0, drawWidth, drawHeight, 0, 0, null, 12)];
-	let numProcessed = 0;
 
 	let maxDepth = this.maxDepth - 1;
 	if (preview > 0 && maxDepth > 3) {
@@ -1065,12 +1062,14 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 				nextQueue.push(bottomRightTile);
 			}
 
-			numProcessed++;
-			if ((numProcessed % 300) === 299 && performance.now() >= beginTime + 20) {
-				context.restore();
-				yield;
-				beginTime = performance.now();
-				context.save();
+			unitsProcessed++;
+			if (unitsProcessed >= benchmark) {
+				const now = calcBenchmark();
+				if (now >= yieldTime) {
+					context.restore();
+					yield;
+					context.save();
+				}
 			}
 
 		}

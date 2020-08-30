@@ -4,7 +4,7 @@
 export default function TenPrint() {
 	const me = this;
 	this.title = '10 PRINT';
-	this.hasRandomness = true;
+	hasRandomness(true);
 	this.helpFile = 'help/ten-print.html';
 
 	this.optionsDocument = downloadFile('ten-print.html', 'document').then(function (optionsDoc) {
@@ -65,7 +65,6 @@ TenPrint.prototype.animatable = {
 };
 
 TenPrint.prototype.generate = function* (context, canvasWidth, canvasHeight, preview) {
-	let beginTime = performance.now();
 	const cellsDownScreen = 25;
 	const tan = Math.tan(Math.max(this.angle, 0.0001));
 	const sqrTan = Math.min(Math.sqrt(tan), 1);
@@ -168,9 +167,12 @@ TenPrint.prototype.generate = function* (context, canvasWidth, canvasHeight, pre
 			}
 			context.fill();
 		}
-		if (cellY % 20 === 19 && performance.now() >= beginTime + 20) {
-			yield;
-			beginTime = performance.now();
+		unitsProcessed++;
+		if (unitsProcessed >= benchmark) {
+			const now = calcBenchmark();
+			if (now >= yieldTime) {
+				yield;
+			}
 		}
 	}
 }

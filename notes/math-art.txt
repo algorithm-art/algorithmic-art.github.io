@@ -6,10 +6,12 @@ Environment
 -----------
 Service Worker
 
-Bug: only enable random button when relevant
-Bug: changing to fulll detail during playback doesn't update finished image
+Add PayPal donation link
+Bug: Handle WebGL context lost while generating video.
+Bug: changing to full detail during playback doesn't update finished image
 Bug: blur doesn't work on still image export
 Bug: scale mode doesn't work with webgl
+Bug: SVG selection box doesn't rotate when the canvas is rotated
 Bug: fading background image to color & color to image?
 Bug: outstanding changes flagged after aborting video rendering
 Bug: initial floating window positions
@@ -19,7 +21,6 @@ Finish dark mode
 Don't make thumbnails lazy loading when visible on start-up
 Performance: remove transparency & shadow when dragging sliders (including playback slider)?
 Bug: WebGL canvas not resizing (needs different field of view)
-Preview mode indicator?
 
 Save As button
 Add credits
@@ -60,6 +61,7 @@ Phyllotaxis
 		Curves
 		Polygon: join adjacent points
 		Recursive: cauliflower
+	Bug: shadows being clipped
 	Clipping bug when aspectRatio > 1 && petalStretch > aspectRatio
 
 Calculator

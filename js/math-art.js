@@ -19,6 +19,18 @@ try {
 	console.warn('Local storage unavailable.');
 }
 
+let unitsProcessed, yieldTime, benchmark;
+
+function calcBenchmark() {
+	const now = performance.now();
+	benchmark = Math.trunc(unitsProcessed / Math.max(now - yieldTime + 40, 1) * 40);
+	return now;
+}
+
+function hasRandomness(enabled) {
+	document.getElementById('generate-btn-group').hidden = !enabled;
+}
+
 {
 	const backendRoot = 'http://localhost/';
 	const backgroundElement = document.body;
@@ -279,18 +291,20 @@ try {
 	}
 
 	class DrawingContext {
-		constructor(canvas, width, height, scale) {
+		constructor(canvas, width, height, scale, svg) {
 			const twoD = canvas.getContext('2d');
 			this.twoD = twoD;
 			this.gl = undefined;
 			this.scale = scale;
+			this.svg = svg;
 			this.twoDMatrixInv = new DOMMatrix([scale, 0, 0, scale, 0, 0]);
 			this.resize(width, height);
 			this.modelViewMatrix = undefined;
 			this.projectionMatrix = undefined;
 			this.uniformLocations = undefined;
 			this.program = undefined;
-			this.types = new Map();
+			this.types = undefined;
+			this.webglInitialized = false;
 		}
 
 		resize(width, height) {
@@ -304,6 +318,11 @@ try {
 				twoD.save();
 			}
 			twoD.save();
+			const svg = this.svg;
+			if (svg !== undefined) {
+				svg.setAttribute('width', width);
+				svg.setAttribute('height', height);
+			}
 
 			const gl = this.gl;
 			if (gl !== undefined) {
@@ -320,8 +339,8 @@ try {
 				mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
 				this.projectionMatrix = projectionMatrix;
 
-				const uniformLocations = this.uniformLocations;
-				if (uniformLocations !== undefined) {
+				if (this.webglInitialized) {
+					const uniformLocations = this.uniformLocations;
 					gl.uniformMatrix4fv(
 						uniformLocations.projectionMatrix,
 						false,
@@ -347,14 +366,18 @@ try {
         }
 
 		initializeShader(generator) {
-			if (generator.shaderSource === undefined) {
-				return;
-			}
 			let gl = this.gl;
-			if (this.gl === undefined) {
+			if (gl === undefined) {
 				const glCanvas = document.createElement('CANVAS');
 				gl = glCanvas.getContext('webgl2', {premultipliedAlpha : false});
 				this.gl = gl;
+				const me = this;
+				glCanvas.addEventListener('webglcontextlost', function (event) {
+					event.preventDefault();
+					me.webglInitialized = false;
+				})
+			}
+			if (!this.webglInitialized) {
 				const positionBuffer = gl.createBuffer();
 				gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 				const points = [
@@ -374,6 +397,7 @@ try {
 				this.modelViewMatrix = modelViewMatrix;
 				const twoDCanvas = this.twoD.canvas;
 				this.resize(twoDCanvas.width, twoDCanvas.height);
+				this.webglInitialized = true;
 			}
 
 			const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
@@ -413,44 +437,56 @@ try {
 			);
 			gl.uniform1f(uniformLocations.width, gl.canvas.width);
 			gl.uniform1f(uniformLocations.height, gl.canvas.height);
+		}
 
-			this.types.clear();
+		restoreShader(generator) {
+			this.initializeShader(generator);
+			this.setProperties(generator);
+		}
+
+		inferTypes(generator) {
+			const types = new Map();
 			const animatable = generator.animatable;
 			if (animatable !== undefined) {
 				const continuous = animatable.continuous;
 				if (continuous !== undefined) {
 					for (let property of continuous) {
-						this.types.set(property, inferGLType(generator[property], false));
+						types.set(property, inferGLType(generator[property], false));
 					}
 				}
 				const stepped = animatable.stepped;
 				if (stepped !== undefined) {
 					for (let property of stepped) {
-						this.types.set(property, inferGLType(generator[property], true));
+						types.set(property, inferGLType(generator[property], true));
 					}
 				}
 				const pairedContinuous = animatable.pairedContinuous;
 				if (pairedContinuous !== undefined) {
 					for (let [property1, property2] of pairedContinuous) {
-						this.types.set(property1, inferGLType(generator[property1], false));
-						this.types.set(property2, inferGLType(generator[property2], false));
+						types.set(property1, inferGLType(generator[property1], false));
+						types.set(property2, inferGLType(generator[property2], false));
 					}
 				}
 				const xy = animatable.xy;
 				if (xy !== undefined) {
 					for (let [property1, property2] of xy) {
-						this.types.set(property1, inferGLType(generator[property1], false));
-						this.types.set(property2, inferGLType(generator[property2], false));
+						types.set(property1, inferGLType(generator[property1], false));
+						types.set(property2, inferGLType(generator[property2], false));
 					}
 				}
 				const pairedStepped = animatable.pairedStepped;
 				if (pairedStepped !== undefined) {
 					for (let [property1, property2] of pairedStepped) {
-						this.types.set(property1, inferGLType(generator[property1], true));
-						this.types.set(property2, inferGLType(generator[property2], true));
+						types.set(property1, inferGLType(generator[property1], true));
+						types.set(property2, inferGLType(generator[property2], true));
 					}
 				}
 			}
+			this.types = types;
+		}
+
+		copyTypes(contextualInfo) {
+			this.types = contextualInfo.types;
 		}
 
 		setProperty(generator, property, value) {
@@ -505,7 +541,10 @@ try {
 
 	}
 
-	const drawingContext = new DrawingContext(canvas, window.innerWidth, window.innerHeight, 1);
+	const drawingContext = new DrawingContext(
+		canvas, window.innerWidth, window.innerHeight, 1,
+		document.getElementById('canvas-overlay')
+	);
 	const signatureBox = document.getElementById('author-hitbox');
 	let signatureChanged = true;
 	let signatureWidth, signatureHeight, userDisplayName;
@@ -618,10 +657,20 @@ try {
 			const redraw = generator.generate(contextualInfo.twoD, width, height, preview);
 			backgroundRedraw = redraw;
 			let done = false;
+			let totalUnits = 0;
+			let totalTime = 1;
 			function drawSection() {
 				if (backgroundRedraw === redraw) {
+					unitsProcessed = 0;
+					const startTime = performance.now();
+					yieldTime = startTime + 40;
 					done = redraw.next().done;
+					totalTime += performance.now() - startTime;
+					totalUnits += unitsProcessed;
 					if (done) {
+						if (totalUnits > 0) {
+							benchmark = Math.trunc(totalUnits / totalTime * 40);
+						}
 						backgroundRedraw = undefined;
 						if (preview === 0) {
 							if (document.fonts.check(signatureFont)) {
@@ -637,7 +686,7 @@ try {
 					}
 				}
 			}
-			drawSection();
+			requestAnimationFrame(drawSection);
 		}
 	}
 
@@ -683,9 +732,9 @@ try {
 
 
 	function transformCanvas(context, width, height, renderWidth, renderHeight, rotation) {
-		context.translate(Math.ceil(width / 2), Math.ceil(height / 2));
+		context.translate(Math.trunc(width / 2), Math.trunc(height / 2));
 		context.rotate(rotation);
-		context.translate(Math.ceil(-renderWidth / 2), Math.ceil(-renderHeight / 2));
+		context.translate(Math.trunc(-renderWidth / 2), Math.trunc(-renderHeight / 2));
 	}
 
 	function progressiveBackgroundGen(preview) {
@@ -835,7 +884,7 @@ try {
 			this.random = random;
 		}
 
-		toObject(hasRandomness) {
+		toObject() {
 			const properties = {};
 			const categories = [
 				'continuous', 'stepped', 'pairedContinuous', 'xy', 'pairedStepped'
@@ -857,9 +906,7 @@ try {
 			data.scale = this.scale;
 			data.scaleMode = this.scaleMode;
 			data.blur = this.blur;
-			if (hasRandomness) {
-				data.seed = this.random.seed;
-			}
+			data.seed = this.random.seed;
 			return data;
 		}
 
@@ -1118,12 +1165,15 @@ try {
 	function resetControl(event) {
 		const id = this.dataset.reset;
 		const control = document.getElementById(id);
-		const value = control.getAttribute('value');
-		const property = idToProperty(id, true);
+		let value = control.getAttribute('value');
 		control.value = value;
 		const controlType = control.type;
 		if (controlType === 'range' || controlType === 'number') {
-			bgGenerator[property] = parseFloat(value);
+			value = parseFloat(value);
+		}
+		const property = idToProperty(id, true);
+		if (bgGenerator.isShader) {
+			drawingContext.setProperty(bgGenerator, property, value);
 		} else {
 			bgGenerator[property] = value;
 		}
@@ -1257,7 +1307,6 @@ try {
 		const x = event.clientX;
 		const y = event.clientY;
 		const [transformedX, transformedY] = drawingContext.transform2DPoint(x, y);
-
 		const context = drawingContext.twoD;
 		const width = canvas.width;
 		const height = canvas.height;
@@ -1265,34 +1314,120 @@ try {
 		bgGenerator.onclick(transformedX, transformedY, scaledWidth, scaledHeight);
 	}
 
-	function loadFailure(exception) {
+	let dragStartX, dragStartY;
+
+	function canvasDrag(event) {
+		const shape = drawingContext.svg.children[0];
+		let x = Math.round(event.clientX);
+		let y = Math.round(event.clientY);
+		let width = x - dragStartX;
+		if (width < 0) {
+			shape.setAttribute('x', x);
+			width = -width;
+		}
+		let height = y - dragStartY;
+		if (height < 0) {
+			shape.setAttribute('y', y);
+			height = -height;
+		}
+		shape.setAttribute('width', width);
+		shape.setAttribute('height', height);
+	}
+
+	function canvasDragEnd() {
+		const svg = drawingContext.svg;
+		svg.removeEventListener('pointermove', canvasDrag);
+		svg.removeEventListener('pointerup', canvasMouseUp);
+		svg.removeEventListener('pointerleave', canvasDragEnd);
+		svg.children[0].setAttribute('visibility', 'hidden');
+	}
+
+	function canvasMouseUp(event) {
+		canvasDragEnd();
+		const shape = drawingContext.svg.children[0];
+		const width = shape.width.baseVal.value;
+		const height = shape.height.baseVal.value;
+		if (width < 4 && height < 4) {
+			return;
+		}
+		const x1 = shape.x.baseVal.value;
+		const y1 = shape.y.baseVal.value;
+		const x2 = x1 + shape.width.baseVal.value;
+		const y2 = y1 + shape.height.baseVal.value;
+		let [transformedX1, transformedY1] = drawingContext.transform2DPoint(x1, y1);
+		let [transformedX2, transformedY2] = drawingContext.transform2DPoint(x2, y2);
+		const context = drawingContext.twoD;
+		const canvasWidth = canvas.width;
+		const canvasHeight = canvas.height;
+		const [scaledWidth, scaledHeight] = calcSize(canvasWidth, canvasHeight, scale, scaleMode);
+		if (bgGenerator.isShader) {
+			transformedY1 = scaledHeight - transformedY1;
+			transformedY2 = scaledHeight - transformedY2;
+		}
+		bgGenerator.ondrag(transformedX1, transformedY1, transformedX2, transformedY2, scaledWidth, scaledHeight);
+	}
+
+	function canvasMouseDown(event) {
+		if (event.button !== 0) {
+			canvasDragEnd();
+			return;
+		}
+		dragStartX = Math.round(event.clientX);
+		dragStartY = Math.round(event.clientY);
+		const svg = drawingContext.svg;
+		const shape = svg.children[0];
+		shape.setAttribute('x', dragStartX);
+		shape.setAttribute('y', dragStartY);
+		shape.setAttribute('width', 0);
+		shape.setAttribute('height', 0)
+		shape.setAttribute('visibility', 'visible');
+		svg.addEventListener('pointermove', canvasDrag);
+		svg.addEventListener('pointerup', canvasMouseUp);
+		svg.addEventListener('pointerleave', canvasDragEnd);
+	}
+
+	drawingContext.svg.addEventListener('pointerdown', canvasMouseDown);
+
+	function loadFailure(exception, hadRandomness) {
 		if (bgGenerator === undefined) {
 			$('#sketches-modal').modal('show');
 		} else {
 			// Keep previous generator
 			document.getElementById('background-gen-options').hidden = false;
 			document.getElementById('background-gen-modal-label').innerHTML = bgGenerator.title;
+			document.getElementById('generate-btn-group').hidden = !hadRandomness;
 		}
 		showAlert(errorAlert, 'The requested sketch could not be loaded.', document.body);
 		console.error(exception);
+	}
+
+	function restoreWebGL() {
+		if (bgGenerator.isShader) {
+			drawingContext.restoreShader(bgGenerator);
+			progressiveBackgroundGen(0);
+		}
 	}
 
 	async function switchGenerator(url, pushToHistory) {
 		// Hide stuff while it changes
 		const container = document.getElementById('background-gen-options');
 		const titleBar = document.getElementById('background-gen-modal-label');
+		const randomControls = document.getElementById('generate-btn-group');
+		const hadRandomness = !randomControls.hidden;
 		container.hidden = true;
 		titleBar.innerHTML = 'Loading&hellip;';
 
 		// Switch generator
-		let gen;
+		let gen, optionsDoc;
 		try {
 			const resolvedURL = /^(\w+:)?\//.test(url) ? url : filePath + url;
 			const genModule = await import(resolvedURL)
 			const constructor = genModule.default;
+			randomControls.hidden = true;
 			gen = new constructor();
+			optionsDoc = await gen.optionsDocument;
 		} catch (e) {
-			loadFailure(e);
+			loadFailure(e, hadRandomness);
 			return;
 		}
 		if (gen.isShader) {
@@ -1306,20 +1441,24 @@ try {
 					shaderDeclarations(gen) +
 					fragFileContent;
 				drawingContext.initializeShader(gen);
+				drawingContext.gl.canvas.addEventListener('webglcontextrestored', restoreWebGL);
+				drawingContext.inferTypes(gen);
 			} catch (e) {
-				loadFailure(e);
+				loadFailure(e, hadRandomness);
 				return;
 			}
 			drawingContext.setProperties(gen);
 		}
 
 		// Set the new generator as the current one.
-		canvas.removeEventListener('click', canvasClick);
+		drawingContext.svg.removeEventListener('pointerdown', canvasMouseDown);
+		drawingContext.svg.removeEventListener('click', canvasClick);
 		bgGenerator = gen;
 		generatorURL = url;
 		if (currentSketch && currentSketch.url !== url) {
 			currentSketch = undefined;
 		}
+		benchmark = Infinity;
 
 		// Reset layer geometry
 		rotation = 0;
@@ -1352,7 +1491,6 @@ try {
 
 		// Create new options dialog
 		container.innerHTML = '';
-		const optionsDoc = await gen.optionsDocument;
 		if (optionsDoc !== undefined) {
 			for (let resetButton of optionsDoc.querySelectorAll('button[data-reset]')) {
 				resetButton.addEventListener('click', resetControl);
@@ -1371,10 +1509,12 @@ try {
 		}
 
 		// Adapt the environment's UI accordingly
-		if (typeof(gen.onclick) === 'function') {
-			canvas.addEventListener('click', canvasClick);
+		if (typeof(gen.ondrag) === 'function') {
+			drawingContext.svg.addEventListener('pointerdown', canvasMouseDown);
 		}
-		document.getElementById('generate-btn-group').hidden = !gen.hasRandomness;
+		if (typeof(gen.onclick) === 'function') {
+			drawingContext.svg.addEventListener('click', canvasClick);
+		}
 		document.getElementById('btn-both-frames').hidden = !hasTween;
 		document.getElementById('btn-both-frames2').hidden = !hasTween;
 		toolbar.hidden = false;
@@ -1407,8 +1547,8 @@ try {
 				if (debug.help) {
 					findBrokenHelp();
 				}
-			} catch {
-				console.error('Unable to load help file.');
+			} catch (e) {
+				console.error(e);
 			}
 		}
 	}
@@ -2053,6 +2193,8 @@ try {
 			const redraw = generator.generate(context, renderWidth, renderHeight, preview);
 			let done;
 			do {
+				yieldTime = performance.now() + 40;
+				unitsProcessed = 0;
 				done = redraw.next().done;
 			} while (!done);
 		} else {
@@ -2997,6 +3139,7 @@ try {
 			const drawHeight = screen.height;
 			const contextualInfo = new DrawingContext(captureCanvas, videoWidth, videoHeight, scale);
 			contextualInfo.initializeShader(bgGenerator);
+			contextualInfo.copyTypes(drawingContext);
 			captureVideo(contextualInfo, drawWidth, drawHeight, length * 1000, properties);
 
 		} else {
@@ -3083,10 +3226,9 @@ try {
 		data.attachments = [];
 
 		doc.sketch = currentSketch.url;
-		const hasRandomness = bgGenerator.hasRandomness
-		doc.startFrame = startFrame.toObject(hasRandomness);
+		doc.startFrame = startFrame.toObject();
 		if (startFrame !== endFrame) {
-			doc.endFrame = endFrame.toObject(hasRandomness);
+			doc.endFrame = endFrame.toObject();
 		}
 
 		const options = {
@@ -3139,6 +3281,7 @@ try {
 				URL.revokeObjectURL(bgGeneratorImage.src);
 			}
 			bgGeneratorImage.src = URL.createObjectURL(file);
+			// The onload event will redraw the image.
 		}
 	});
 
