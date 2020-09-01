@@ -7,12 +7,13 @@ Environment
 Service Worker
 
 Add PayPal donation link
+Bug: dragging position slider doesn't leave background permanently transitioned
+Bug: Can't drag underneath modals, etc.
+Bug: lose drag selection when dragging outside the window
 Bug: Handle WebGL context lost while generating video.
-Bug: changing to full detail during playback doesn't update finished image
 Bug: blur doesn't work on still image export
 Bug: scale mode doesn't work with webgl
 Bug: SVG selection box doesn't rotate when the canvas is rotated
-Bug: fading background image to color & color to image?
 Bug: outstanding changes flagged after aborting video rendering
 Bug: initial floating window positions
 Bug: resizing window while video rendering messes up scale parameter
@@ -23,6 +24,7 @@ Performance: remove transparency & shadow when dragging sliders (including playb
 Bug: WebGL canvas not resizing (needs different field of view)
 
 Save As button
+Anonymize button
 Add credits
 Add URL to signature
 Responsiveness issues
@@ -88,6 +90,14 @@ New Sketches
 ------------
 Copy machine
 	Change to stack based implementation
+
+Moire
+-----
+	Parallel lines
+	Concentric circles
+	Grid of dots
+	Sine wave
+	Radial lines (including skewed)
 
 Parser Failures
 ---------------

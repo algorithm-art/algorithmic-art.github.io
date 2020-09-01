@@ -571,8 +571,6 @@ function hasRandomness(enabled) {
 			signatureHeight = 30;
 		} else {
 			const context = drawingContext.twoD;
-			context.restore();
-			context.save();
 			context.font = signatureFont;
 			context.textAlign = 'left';
 			context.textBaseline = 'bottom';
@@ -591,8 +589,6 @@ function hasRandomness(enabled) {
 		if (signatureChanged) {
 			calcSignature();
 		} else {
-			context.restore();
-			context.save();
 			context.textAlign = 'left';
 			context.textBaseline = 'bottom';
 		}
@@ -640,7 +636,7 @@ function hasRandomness(enabled) {
 		context.fillText(signatureText, paddingX, canvasHeight - onePx);
 	}
 
-	function progressiveBackgroundDraw(generator, contextualInfo, width, height, preview) {
+	function progressiveBackgroundDraw(generator, contextualInfo, width, height, preview, callback) {
 		if (generator.isShader) {
 			contextualInfo.drawGL(parseFloat(animPositionSlider.value), preview);
 			if (preview === 0) {
@@ -652,9 +648,11 @@ function hasRandomness(enabled) {
 					});
 				}
 			}
+			document.body.classList.remove('cursor-progress');
 		} else {
 			random.reset();
-			const redraw = generator.generate(contextualInfo.twoD, width, height, preview);
+			const context = contextualInfo.twoD;
+			const redraw = generator.generate(context, width, height, preview);
 			backgroundRedraw = redraw;
 			let done = false;
 			let totalUnits = 0;
@@ -668,10 +666,8 @@ function hasRandomness(enabled) {
 					totalTime += performance.now() - startTime;
 					totalUnits += unitsProcessed;
 					if (done) {
-						if (totalUnits > 0) {
-							benchmark = Math.trunc(totalUnits / totalTime * 40);
-						}
-						backgroundRedraw = undefined;
+						context.restore();
+						context.save();
 						if (preview === 0) {
 							if (document.fonts.check(signatureFont)) {
 								drawSignature(contextualInfo);
@@ -681,6 +677,12 @@ function hasRandomness(enabled) {
 								});
 							}
 						}
+						callback();
+						if (totalUnits > 0) {
+							benchmark = Math.trunc(totalUnits / totalTime * 40);
+						}
+						backgroundRedraw = undefined;
+						document.body.classList.remove('cursor-progress');
 					} else {
 						requestAnimationFrame(drawSection);
 					}
@@ -737,7 +739,17 @@ function hasRandomness(enabled) {
 		context.translate(Math.trunc(-renderWidth / 2), Math.trunc(-renderHeight / 2));
 	}
 
+	function drawBackgroundImage() {
+		if (backgroundImage !== undefined) {
+			const context = drawingContext.twoD;
+			context.globalCompositeOperation = 'destination-over';
+			context.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+			context.globalCompositeOperation = 'source-over';
+		}
+	}
+
 	function progressiveBackgroundGen(preview) {
+		document.body.classList.add('cursor-progress');
 		const context = drawingContext.twoD;
 		const width = canvas.width;
 		const height = canvas.height;
@@ -745,14 +757,10 @@ function hasRandomness(enabled) {
 		context.clearRect(0, 0, width, height);
 		context.save();
 
-		if (backgroundImage !== undefined) {
-			context.drawImage(backgroundImage, 0, 0, width, height);
-		}
-
 		const [scaledWidth, scaledHeight] = calcSize(width, height, scale, scaleMode);
 		transformCanvas(context, width, height, scaledWidth, scaledHeight, rotation);
 		context.globalAlpha = opacity;
-		progressiveBackgroundDraw(bgGenerator, drawingContext, scaledWidth, scaledHeight, preview);
+		progressiveBackgroundDraw(bgGenerator, drawingContext, scaledWidth, scaledHeight, preview, drawBackgroundImage);
 	}
 
 	generateBackground = progressiveBackgroundGen;
@@ -1321,17 +1329,32 @@ function hasRandomness(enabled) {
 		let x = Math.round(event.clientX);
 		let y = Math.round(event.clientY);
 		let width = x - dragStartX;
-		if (width < 0) {
-			shape.setAttribute('x', x);
-			width = -width;
-		}
 		let height = y - dragStartY;
-		if (height < 0) {
-			shape.setAttribute('y', y);
-			height = -height;
+
+		switch (shape.tagName) {
+		case 'circle':
+			const radius = Math.hypot(width, height);
+			shape.setAttribute('r', radius);
+			break;
+
+		case 'line':
+			shape.setAttribute('x2', x);
+			shape.setAttribute('y2', y);
+			break;
+
+		case 'rect':
+			if (width < 0) {
+				shape.setAttribute('x', x);
+				width = -width;
+			}
+			if (height < 0) {
+				shape.setAttribute('y', y);
+				height = -height;
+			}
+			shape.setAttribute('width', width);
+			shape.setAttribute('height', height);
+			break;
 		}
-		shape.setAttribute('width', width);
-		shape.setAttribute('height', height);
 	}
 
 	function canvasDragEnd() {
@@ -1345,17 +1368,45 @@ function hasRandomness(enabled) {
 	function canvasMouseUp(event) {
 		canvasDragEnd();
 		const shape = drawingContext.svg.children[0];
-		const width = shape.width.baseVal.value;
-		const height = shape.height.baseVal.value;
+		const shapeType = shape.tagName;
+		let x1, y1, x2, y2, radius, width, height;
+		switch (shapeType) {
+		case 'circle':
+			x1 = dragStartX;
+			y1 = dragStartY;
+			radius = shape.r.baseVal.value;
+			width = radius;
+			height = radius;
+			break;
+
+		case 'line':
+			x1 = dragStartX;
+			y1 = dragStartY;
+			x2 = shape.x2.baseVal.value;
+			y2 = shape.y2.baseVal.value;
+			width = Math.abs(x2 - x1);
+			height = Math.abs(y2 - y1);
+			break;
+
+		case 'rect':
+			x1 = shape.x.baseVal.value;
+			y1 = shape.y.baseVal.value;
+			width = shape.width.baseVal.value;
+			height = shape.height.baseVal.value;
+			x2 = x1 + width;
+			y2 = y1 + height;
+			break;
+		}
 		if (width < 4 && height < 4) {
 			return;
 		}
-		const x1 = shape.x.baseVal.value;
-		const y1 = shape.y.baseVal.value;
-		const x2 = x1 + shape.width.baseVal.value;
-		const y2 = y1 + shape.height.baseVal.value;
 		let [transformedX1, transformedY1] = drawingContext.transform2DPoint(x1, y1);
-		let [transformedX2, transformedY2] = drawingContext.transform2DPoint(x2, y2);
+		let transformedX2, transformedY2;
+		if (shapeType === 'circle') {
+			[transformedX2, transformedY2] = [transformedX1 + radius, transformedY1];
+		} else {
+			[transformedX2, transformedY2] = drawingContext.transform2DPoint(x2, y2);
+		}
 		const context = drawingContext.twoD;
 		const canvasWidth = canvas.width;
 		const canvasHeight = canvas.height;
@@ -1375,11 +1426,47 @@ function hasRandomness(enabled) {
 		dragStartX = Math.round(event.clientX);
 		dragStartY = Math.round(event.clientY);
 		const svg = drawingContext.svg;
-		const shape = svg.children[0];
-		shape.setAttribute('x', dragStartX);
-		shape.setAttribute('y', dragStartY);
-		shape.setAttribute('width', 0);
-		shape.setAttribute('height', 0)
+		let shape = svg.children[0];
+		const shapeType = bgGenerator.dragShape || 'rect';
+		if (shape.tagName !== shapeType) {
+			shape.remove();
+			shape = document.createElementNS('http://www.w3.org/2000/svg', shapeType);
+			switch (shapeType) {
+			case 'line':
+				svg.style.mixBlendMode = 'difference';
+				shape.setAttribute('stroke', 'white');
+				shape.setAttribute('stroke-width', 3);
+				break;
+
+			case 'circle':
+			case 'rect':
+				svg.style.mixBlendMode = 'normal';
+				shape.setAttribute('fill', 'hsla(210, 50%, 50%, 0.55)');
+				break;
+			}
+			svg.appendChild(shape);
+		}
+		switch (shapeType) {
+		case 'circle':
+			shape.setAttribute('cx', dragStartX);
+			shape.setAttribute('cy', dragStartY);
+			shape.setAttribute('r', 0);
+			break;
+
+		case 'line':
+			shape.setAttribute('x1', dragStartX);
+			shape.setAttribute('x2', dragStartX);
+			shape.setAttribute('y1', dragStartY);
+			shape.setAttribute('y2', dragStartY);
+			break;
+
+		case 'rect':
+			shape.setAttribute('x', dragStartX);
+			shape.setAttribute('y', dragStartY);
+			shape.setAttribute('width', 0);
+			shape.setAttribute('height', 0)
+			break;
+		}
 		shape.setAttribute('visibility', 'visible');
 		svg.addEventListener('pointermove', canvasDrag);
 		svg.addEventListener('pointerup', canvasMouseUp);
@@ -1451,8 +1538,9 @@ function hasRandomness(enabled) {
 		}
 
 		// Set the new generator as the current one.
-		drawingContext.svg.removeEventListener('pointerdown', canvasMouseDown);
-		drawingContext.svg.removeEventListener('click', canvasClick);
+		const svg = drawingContext.svg;
+		svg.removeEventListener('pointerdown', canvasMouseDown);
+		svg.removeEventListener('click', canvasClick);
 		bgGenerator = gen;
 		generatorURL = url;
 		if (currentSketch && currentSketch.url !== url) {
@@ -1510,10 +1598,13 @@ function hasRandomness(enabled) {
 
 		// Adapt the environment's UI accordingly
 		if (typeof(gen.ondrag) === 'function') {
-			drawingContext.svg.addEventListener('pointerdown', canvasMouseDown);
+			svg.addEventListener('pointerdown', canvasMouseDown);
+			svg.style.cursor = 'crosshair';
+		} else {
+			svg.style.cursor = 'auto';
 		}
 		if (typeof(gen.onclick) === 'function') {
-			drawingContext.svg.addEventListener('click', canvasClick);
+			svg.addEventListener('click', canvasClick);
 		}
 		document.getElementById('btn-both-frames').hidden = !hasTween;
 		document.getElementById('btn-both-frames2').hidden = !hasTween;
@@ -1968,11 +2059,15 @@ function hasRandomness(enabled) {
 				context.drawImage(startImage, 0, 0, dWidth, dHeight);
 			}
 		} else if (tween < endFade) {
+			const fadeAmount = (endFade - tween)  / (endFade - startFade);
 			if (hasEndImage) {
+				if (!hasStartImage) {
+					context.globalAlpha = 1 - fadeAmount;
+				}
 				context.drawImage(endImage, 0, 0, dWidth, dHeight);
 			}
 			if (hasStartImage) {
-				context.globalAlpha = (endFade - tween)  / (endFade - startFade);
+				context.globalAlpha = fadeAmount;
 				context.drawImage(startImage, 0, 0, dWidth, dHeight);
 			}
 		} else {
@@ -1986,9 +2081,7 @@ function hasRandomness(enabled) {
 
 		constructor(generator, startFrame, endFrame, width, height) {
 
-			this.backgroundColorVaries =
-				startFrame.backgroundColor !== endFrame.backgroundColor &&
-				(startFrame.backgroundImage !== undefined || endFrame.backgroundImage !== undefined);
+			this.backgroundColorVaries = startFrame.backgroundColor !== endFrame.backgroundColor;
 
 			this.blurVaries = startFrame.blur !== endFrame.blur;
 
@@ -2057,6 +2150,25 @@ function hasRandomness(enabled) {
 	}
 
 	function calcTweenData() {
+		const hasStartImage = startFrame.backgroundImage !== undefined;
+		const hasEndImage = endFrame.backgroundImage !== undefined;
+		if (hasStartImage !== hasEndImage) {
+			let imageFrame, colorFrame;
+			if (hasStartImage) {
+				imageFrame = startFrame;
+				colorFrame = endFrame;
+			} else {
+				imageFrame = endFrame;
+				colorFrame = startFrame;
+			}
+			const [r, g, b] = parseColor(colorFrame.backgroundColor)[1];
+			const color = rgbToLuma(r, g, b) >= 0.5 ? 'rgb(255, 255, 255)' : 'rgb(0, 0, 0)';
+			imageFrame.backgroundColor = color;
+			if (currentFrame === imageFrame) {
+				backgroundElement.style.backgroundColor = color;
+			}
+		}
+
 		tweenData = new TweenData(bgGenerator, startFrame, endFrame, canvas.width, canvas.height);
 		backgroundElement.style.willChange = tweenData.backgroundColorVaries ? 'background-color' : 'auto';
 	}
@@ -2100,17 +2212,12 @@ function hasRandomness(enabled) {
 	const tempCanvas = document.createElement('CANVAS');
 	const tempContext = tempCanvas.getContext('2d');
 
-	function fillBackground(context, backgroundColor, filter, width, height) {
+	function applyFilter(context, filter, width, height) {
 		tempCanvas.width = context.canvas.width;
 		tempCanvas.height = context.canvas.height;
 		tempContext.drawImage(context.canvas, 0, 0);
-		context.restore();
-		context.save();
-		context.fillStyle = backgroundColor;
-		context.fillRect(0, 0, width, height);
 		context.filter = filter;
-		context.drawImage(tempCanvas, 0, 0, width, height);
-		context.fillStyle = 'black';
+		context.drawImage(tempCanvas, 0, 0);
 		context.filter = '';
 	}
 
@@ -2179,14 +2286,37 @@ function hasRandomness(enabled) {
 		context.restore();
 		context.clearRect(0, 0, width, height);
 		context.save();
-		interpolateBackgroundImage(startFrame.backgroundImage, endFrame.backgroundImage, context, tween, loop);
 		const renderWidth = interpolateValue(tweenData.startWidth, tweenData.endWidth, tweenPrime, false);
 		const renderHeight = interpolateValue(tweenData.startHeight, tweenData.endHeight, tweenPrime, false);
 		transformCanvas(context, width, height, renderWidth, renderHeight, rotation);
+		const blur = interpolateValue(startFrame.blur, endFrame.blur, tweenPrime, false);
 		context.globalAlpha = interpolateValue(startFrame.opacity, endFrame.opacity, tweenPrime, false);
+		let needDrawSignature = paintBackground || !forAnim;
+
+		function postDraw() {
+			context.globalCompositeOperation = 'destination-over';
+			interpolateBackgroundImage(startFrame.backgroundImage, endFrame.backgroundImage, context, tween, loop);
+			if (paintBackground) {
+				context.fillStyle = backgroundColor;
+				context.fillRect(0, 0, width, height);
+				if (blur > 0) {
+					context.globalCompositeOperation = 'source-over';
+					applyFilter(context, calcBlur(blur), width, height);
+				}
+				context.fillStyle = 'black';
+			} else if (tweenData.blurVaries) {
+				context.canvas.style.filter = calcBlur(blur);
+			}
+			context.globalCompositeOperation = 'source-over';
+			if (needDrawSignature) {
+				drawSignature(contextualInfo);
+			}
+		}
+
 		if (generator.isShader) {
 			contextualInfo.setProperties(generator);
 			contextualInfo.drawGL(tweenPrime, preview);
+			postDraw()
 		} else if (forAnim) {
 			// Draw everything in one go when capturing video
 			random.reset();
@@ -2197,17 +2327,10 @@ function hasRandomness(enabled) {
 				unitsProcessed = 0;
 				done = redraw.next().done;
 			} while (!done);
+			postDraw();
 		} else {
-			progressiveBackgroundDraw(generator, contextualInfo, renderWidth, renderHeight, preview);
-		}
-		const blur = interpolateValue(startFrame.blur, endFrame.blur, tweenPrime, false);
-		if (paintBackground) {
-			fillBackground(context, backgroundColor, calcBlur(blur), width, height);
-		} else if (tweenData.blurVaries) {
-			canvas.style.filter = calcBlur(blur);
-		}
-		if (paintBackground || !forAnim) {
-			drawSignature(contextualInfo);
+			needDrawSignature = false;
+			progressiveBackgroundDraw(generator, contextualInfo, renderWidth, renderHeight, preview, postDraw);
 		}
 	}
 
@@ -2354,7 +2477,7 @@ function hasRandomness(enabled) {
 			helpContextItem.popover('dispose');
 		}
 
-		document.body.classList.add('context-help');
+		document.body.classList.add('cursor-help');
 		helpContext = true;
 		helpContextItem = $(this);
 		helpContextItem.popover({
@@ -2390,7 +2513,7 @@ function hasRandomness(enabled) {
 		if (helpContext) {
 			let popoverTitle = '';
 			let popoverContent = null;
-			document.body.classList.remove('context-help');
+			document.body.classList.remove('cursor-help');
 			helpContext = false;
 
 			const rootElement = document.body;
@@ -2501,12 +2624,12 @@ function hasRandomness(enabled) {
 		if (value === 'color') {
 			$('#background-color-row').collapse('show');
 			backgroundImage = undefined;
+			const [r, g, b] = parseColor(backgroundElement.style.backgroundColor)[1];
+			const color = rgbToHex(r, g, b);
+			document.getElementById('background-color').value = color;
 			progressiveBackgroundGen(0);
 		} else {
 			$('#background-color-row').collapse('hide');
-			const color = darkMode() ? '#000000' : '#ffffff';
-			document.getElementById('background-color').value = color;
-			backgroundElement.style.backgroundColor = color;
 			backgroundImage = document.createElement('IMG');
 			backgroundImage.onload = redraw;
 			backgroundImage.src = 'img/texture/' + value + '.jpg';
@@ -2831,11 +2954,7 @@ function hasRandomness(enabled) {
 		const tween = animController.progress;
 		animPositionSlider.value = tween;
 		updateAnimPositionReadout(tween);
-		if (playPreview > 0) {
-			syncAndDraw();
-		} else {
-			syncToPosition();
-		}
+		syncAndDraw();
 		animController = undefined;
 	}
 
