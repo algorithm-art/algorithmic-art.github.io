@@ -126,6 +126,7 @@ th.col-form-label {
 }
 
 .modal-floating {
+	height: -moz-fit-content;
 	height: fit-content;
 	z-index: 0;
 }
@@ -228,15 +229,6 @@ th.col-form-label {
 	.modal-floating .modal-dialog {
 		max-width: 100%;
 	}
-
-	.modal-wide {
-		width: fit-content;
-		max-width: calc(100% - 2rem);
-	}
-
-	.modal-wide .modal-content {
-		width: fit-content;
-	}
 }
 
 @media (min-width: 768px) and (min-height: 768px) {
@@ -301,6 +293,7 @@ th.col-form-label {
 .center-x {
 	left: 50%;
 	transform: translateX(-50%);
+	width: -moz-fit-content;
 	width: fit-content;
 }
 
@@ -405,10 +398,13 @@ button.btn-black:hover {
 }
 
 .max-w-fit {
+	max-width: -moz-fit-content;
 	max-width: fit-content;
 }
 
 .w-fit {
+	min-width: -moz-fit-content;
+	max-width: -moz-fit-content;
 	min-width: fit-content;
 	max-width: fit-content;
 }
@@ -459,7 +455,6 @@ button.btn-black:hover {
 .thumbnails {
 	display: flex;
 	flex-wrap: wrap;
-	justify-content: center;
 }
 
 .thumbnails>.active {
@@ -481,12 +476,13 @@ button.btn-black:hover {
 }
 
 @media (min-width: 576px) {
-	#help-modal .modal-wide {
-		width: min(100% - 2rem, 45rem);
+	#sketches-modal .modal-dialog {
+		min-width: calc(100% - 2rem);
+		max-width: calc(100% - 2rem);
 	}
 
-	#help-modal .modal-content {
-		width: 100%;
+	#help-modal .modal-dialog {
+		max-width: min(100% - 2rem, 45rem);
 	}
 }
 
@@ -535,7 +531,7 @@ button.btn-black:hover {
 	position: absolute;
 	top: 33vh;
 	transform: translate(-50%, max(-33%, -33vh));
-	width: fit-content;
+	width: max-content;
 }
 
 .overlay-content>* {

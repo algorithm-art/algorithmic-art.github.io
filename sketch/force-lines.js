@@ -16,19 +16,25 @@ export default function FieldLines() {
 	this.positionX = positionX;
 	this.positionY = positionY;
 	this.strength = strength;
-	this.fieldConstant = 300;
+	this.fieldConstant = 500;
 	this.hueFrequency = 1;
+	this.hueRotation = 0;
 	this.saturation = 1;
 	this.maxLightness = 0.85;
+	this.minLightness = 0;
+	this.colorPortion = 0.5;
+	this.sharpness = 0;
 	this.fieldExponent = 2;
+	this.antialiasing = 2;
 }
 
 FieldLines.prototype.animatable = {
 	continuous: [
 		'positionX', 'positionY', 'strength', 'fieldConstant', 'fieldExponent',
-		'hueFrequency', 'saturation', 'maxLightness',
+		'hueFrequency', 'hueRotation', 'saturation', 'minLightness', 'maxLightness',
+		'colorPortion', 'sharpness',
 	],
 	stepped: [
-		'numAttractors',
+		'numAttractors', 'antialiasing',
 	],
 }
