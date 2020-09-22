@@ -31,8 +31,8 @@ input[type=color] {
 	cursor: pointer;
 }
 
-legend {
-	font-size: 1.25rem;
+h5, h6 {
+	font-weight: normal;
 }
 
 option:disabled {
@@ -68,7 +68,7 @@ th.col-form-label {
 	border-color: hsl(134, 61%, 35%);
 }
 
-.btn-form {
+.btn-form, .bg-form {
 	background-color: var(--form-color);
 }
 

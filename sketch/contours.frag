@@ -1,6 +1,19 @@
 const int MAX_ATTRACTORS = 50;
 const float TWO_PI = 2.0 * PI;
 
+float angle(float x, float y) {
+	if (x == 0.0) {
+		return sign(y) * PI / 2.0;
+	} else {
+		return atan(y, x);
+	}
+}
+
+float power(float base, int exponent) {
+	float s = exponent % 2 == 0 ? 1.0 : sign(base);
+	return s * pow(base, float(abs(exponent)));
+}
+
 float distanceMetric(float x1, float y1, float x2, float y2) {
 	if (minkowskiOrder == 0.0) {
 		return 0.0;
@@ -23,31 +36,39 @@ float distanceMetric(float x1, float y1, float x2, float y2) {
 	);
 }
 
-float angle(float x, float y) {
-	if (x == 0.0) {
-		return sign(y) * PI / 2.0;
-	} else {
-		return atan(y, x);
-	}
+float sineFunc(float sine, int exponent) {
+	return (power(sine, 2 * exponent) - 1.0 + colorPortion);
 }
 
-float power(float base, int exponent) {
-	float s = exponent % 2 == 0 ? 1.0 : sign(base);
-	return s * pow(base, float(abs(exponent)));
+vec4 colorFunc(int n, float scaledForce, float wave) {
+	float a = wave * (scaledForce * baseBrightness[2] + (1.0 - scaledForce) * baseBrightness[0]);
+	float aPrime = (1.0 - wave) * (scaledForce * baseBrightness[3] + (1.0 - scaledForce) * baseBrightness[1]);
+	float b = scaledForce * (wave * baseBrightness[2] + (1.0 - wave) * baseBrightness[3]);
+	switch (n) {
+	case 0:
+		return vec4(a, b, aPrime, 1.0);
+	case 1:
+		return vec4(b, a, aPrime, 1.0);
+	case 2:
+		return vec4(aPrime, a, b, 1.0);
+	case 3:
+		return vec4(aPrime, b, a, 1.0);
+	case 4:
+		return vec4(b, aPrime, a, 1.0);
+	default:
+		return vec4(a, aPrime, b, 1.0);
+	}
 }
 
 void main() {
-	if (colorPortion == 0.0) {
-		fragColor = vec4(0.0, 0.0, 0.0, 0.0);
-		return;
-	}
-
-	float hue, lightness, opacity = 1.0;
+	float hue, lightness, opacity = 1.0, gradient = 1.0;
 	float lastRed = floor(hueFrequency) / hueFrequency;
-	float uncoloredPart = maxLightness * (1.0 - colorPortion);
 	float saturation = 0.0;
 
 	int numPoints = int(ceil(numAttractors));
+	if (preview > 0) {
+		numPoints = min(numPoints, 5);
+	}
 	float finalPointScale = fract(numAttractors);
 	if (finalPointScale == 0.0) {
 		finalPointScale = 1.0;
@@ -74,6 +95,14 @@ void main() {
 		if (i == numPoints - 1) {
 			pointStrength *= finalPointScale;
 		}
+
+		float dotSize = round(max(pointStrength * maxDotSize, minDotSize));
+		if (distance < dotSize + 1.0) {
+			float lightness = distance <= dotSize ? 1.0 : 1.0 - fract(distance);
+			fragColor = hsla(dotColor[0], dotColor[1], dotColor[2] * lightness, dotColor[3]);
+			return;
+		}
+
 		float force =
 			fieldConstant * pointStrength *
 			pow(base, -pow(distance / divisor, fieldExponent));
@@ -88,10 +117,20 @@ void main() {
 	}
 
 	float netForce = sqrt(forceX * forceX + forceY * forceY);
-	float wave = max(
-		(power(sin(netForce), 2 * sinePower) - (1.0 - colorPortion)) / colorPortion,
-		0.0
-	);
+	float wave;
+	if (colorPortion == 0.0) {
+		wave = 0.0;
+	} else {
+		float sine = sin(netForce * sineFrequency / 2.0);
+		int lowerPower = int(sinePower);
+		float upperPowerFrac = fract(sinePower);
+	 	wave = max(
+			((1.0 - upperPowerFrac) *sineFunc(sine, lowerPower) +
+			upperPowerFrac * sineFunc(sine, lowerPower + 1)) / colorPortion,
+			0.0
+		);
+	}
+	float scaledForce = min(netForce / baseScale, 1.0);
 
 	hue = mod(-angle(forceX, forceY) + 0.5 * PI, TWO_PI) / TWO_PI;
 	if (hueFrequency < 1.0) {
@@ -103,19 +142,40 @@ void main() {
 	} else {
 		hue = hue * hueFrequency;
 	}
-	hue = mod(hue - hueRotation + waveHue * (1.0 - wave), 1.0);
+	hue = mod(hue + hueRotation + waveHue * (1.0 - wave), 1.0);
 
-	saturation = overallSaturation * saturation / totalForce;
+	saturation /= totalForce;
 
 	lightness = maxLightness *
 		(waveLightness * wave + 1.0 - waveLightness);
 
+	float uncoloredPart = maxLightness * (1.0 - colorPortion);
 	if (wave < uncoloredPart && lightness < 0.5) {
-		opacity = lightness / (uncoloredPart * (1.0 - sharpness));
-		saturation = saturation * min(opacity, backgroundSaturation);
+		gradient = lightness / (uncoloredPart * (1.0 - sharpness));
+		opacity = gradient;
+		saturation = saturation * min(gradient, backgroundSaturation);
 		lightness *= 1.0 - contrast;
+	} else {
+		saturation *= foregroundSaturation;
 	}
 	lightness = max(lightness, minLightness);
 
-	fragColor = hsla(hue, saturation, lightness, opacity);
+	vec4 color = hsla(hue, saturation, lightness, opacity);
+
+	float baseColorMod = mod(baseColor, 6.0);
+	if (baseColorMod < 0.0) {
+		baseColorMod = 6.0 + baseColorMod;
+	}
+	int lowerBaseColor = int(baseColorMod);
+	float baseColorFrac = fract(baseColorMod);
+	int upperBaseColor = (lowerBaseColor + 1) % 6;
+
+	fragColor = (1.0 - baseColorFrac) * colorFunc(lowerBaseColor, scaledForce, wave);
+	fragColor += baseColorFrac * colorFunc(upperBaseColor, scaledForce, wave);
+	float pixelBaseIntensity = max(baseIntensity, 1.0 - gradient);
+	fragColor *= pixelBaseIntensity;
+	fragColor.a =
+		backgroundOpacity * (1.0 - baseIntensity) +
+		baseIntensity * (backgroundOpacity + (1.0 - backgroundOpacity) * wave);
+	fragColor += (1.0 - pixelBaseIntensity) * color;
 }
