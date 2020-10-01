@@ -41,57 +41,84 @@ float sineFunc(float sine, int exponent) {
 }
 
 vec4 colorFunc(int n, float scaledForce, float wave) {
-	float a = wave * (scaledForce * baseBrightness[2] + (1.0 - scaledForce) * baseBrightness[0]);
-	float aPrime = (1.0 - wave) * (scaledForce * baseBrightness[3] + (1.0 - scaledForce) * baseBrightness[1]);
-	float b = scaledForce * (wave * baseBrightness[2] + (1.0 - wave) * baseBrightness[3]);
+	float a = wave * (scaledForce * baseBrightness[0] + (1.0 - scaledForce) * baseBrightness[2]);
+	float aPrime = (1.0 - wave) * (scaledForce * baseBrightness[1] + (1.0 - scaledForce) * baseBrightness[3]);
+	float b = scaledForce * (wave * baseBrightness[0] + (1.0 - wave) * baseBrightness[1]);
+	float aDesaturation = 1.0 - minSaturation;
+	float aPrimeDesaturation = 1.0 - abs(backgroundSaturation);
+	float bDesaturation = 1.0 - baseSaturation;
+	float aNew = a  + (1.0 - a) * min(b * bDesaturation + aPrime * aPrimeDesaturation, 1.0);
+	float aPrimeNew = aPrime + (1.0 - aPrime) * min(a * aDesaturation + b * bDesaturation, 1.0);
+	float bNew = b  + (1.0 - b) * min(a * aDesaturation + aPrime * aPrimeDesaturation, 1.0);
+
 	switch (n) {
 	case 0:
-		return vec4(a, b, aPrime, 1.0);
+		return vec4(aNew, bNew, aPrimeNew, 1.0);
 	case 1:
-		return vec4(b, a, aPrime, 1.0);
+		return vec4(bNew, aNew, aPrimeNew, 1.0);
 	case 2:
-		return vec4(aPrime, a, b, 1.0);
+		return vec4(aPrimeNew, aNew, bNew, 1.0);
 	case 3:
-		return vec4(aPrime, b, a, 1.0);
+		return vec4(aPrimeNew, bNew, aNew, 1.0);
 	case 4:
-		return vec4(b, aPrime, a, 1.0);
+		return vec4(bNew, aPrimeNew, aNew, 1.0);
 	default:
-		return vec4(a, aPrime, b, 1.0);
+		return vec4(aNew, aPrimeNew, bNew, 1.0);
 	}
 }
 
+int gcd(int n, int m) {
+	if (m == 1) {
+		return 1;
+	}
+	while (n != 0 && m != 0) {
+		if (n > m) {
+			n %= m;
+		} else {
+			m %= n;
+		}
+	}
+	return max(n, m);
+}
+
+int findCoprime(int n, int m) {
+	while (gcd(n, m) != 1) {
+		m--;
+	}
+	return m;
+}
+
 void main() {
-	float hue, lightness, opacity = 1.0, gradient = 1.0;
+	float hue, lightness, saturation = 0.0, opacity = 1.0, gradient = 1.0;
 	float lastRed = floor(hueFrequency) / hueFrequency;
-	float saturation = 0.0;
 
 	int numPoints = int(ceil(numAttractors));
-	if (preview > 0) {
+	float finalPointScale;
+	if (preview == 0) {
+		finalPointScale = fract(numAttractors);
+		if (finalPointScale == 0.0) {
+			finalPointScale = 1.0;
+		}
+		finalPointScale = explosion + finalPointScale * (1.0 - explosion);
+	} else {
 		numPoints = min(numPoints, 5);
-	}
-	float finalPointScale = fract(numAttractors);
-	if (finalPointScale == 0.0) {
 		finalPointScale = 1.0;
 	}
-	finalPointScale = explosion + finalPointScale * (1.0 - explosion);
-
-	float[MAX_ATTRACTORS] scaledXPos, scaledYPos;
-	for (int i = 0; i < numPoints; i++) {
-		scaledXPos[i] = positionX[i] * canvasWidth;
-		scaledYPos[i] = positionY[i] * canvasHeight;
-	}
+	int modulus = findCoprime(MAX_ATTRACTORS, step);
 
 	float x = gl_FragCoord.x;
 	float y = gl_FragCoord.y;
 	float forceX = 0.0, forceY = 0.0;
-	float totalForce = 0.0;
+	float lightingDivisor = lighting * min(canvasWidth, canvasHeight) / 10.0;
+	lightingDivisor *= 5.0 * pow(2.0, -log(numAttractors) / log(5.0));
 
 	for (int i = 0; i < numPoints; i++) {
-		float x2 = scaledXPos[i];
-		float y2 = scaledYPos[i];
+		int index = (i * modulus) % MAX_ATTRACTORS;
+		float x2 = positionX[index] * canvasWidth;
+		float y2 = positionY[index] * canvasHeight;
 		float distance = distanceMetric(x, y, x2, y2);
 
-		float pointStrength = strength[i];
+		float pointStrength = strength[index];
 		if (i == numPoints - 1) {
 			pointStrength *= finalPointScale;
 		}
@@ -103,17 +130,15 @@ void main() {
 			return;
 		}
 
-		float force =
-			fieldConstant * pointStrength *
-			pow(base, -pow(distance / divisor, fieldExponent));
+		float fallOff = pow(base, -pow(distance / divisor, fieldExponent));
+		float force = fieldConstant * pointStrength * fallOff;
 
 		float attractorAngle = angle(x - x2, y - y2);
 		forceX += force * cos(attractorAngle);
 		forceY += force * sin(attractorAngle);
 
-		float absForce = abs(force);
-		saturation += saturations[i] * absForce;
-		totalForce += absForce;
+		float d = distance / lightingDivisor;
+		saturation += saturations[index] / (1.0 + d * d);
 	}
 
 	float netForce = sqrt(forceX * forceX + forceY * forceY);
@@ -144,7 +169,7 @@ void main() {
 	}
 	hue = mod(hue + hueRotation + waveHue * (1.0 - wave), 1.0);
 
-	saturation /= totalForce;
+	saturation = min(saturation, 1.0) * (maxSaturation - minSaturation) + minSaturation;
 
 	lightness = maxLightness *
 		(waveLightness * wave + 1.0 - waveLightness);
@@ -155,8 +180,6 @@ void main() {
 		opacity = gradient;
 		saturation = saturation * min(gradient, backgroundSaturation);
 		lightness *= 1.0 - contrast;
-	} else {
-		saturation *= foregroundSaturation;
 	}
 	lightness = max(lightness, minLightness);
 
