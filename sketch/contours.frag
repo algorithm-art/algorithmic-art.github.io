@@ -9,11 +9,6 @@ float angle(float x, float y) {
 	}
 }
 
-float power(float base, int exponent) {
-	float s = exponent % 2 == 0 ? 1.0 : sign(base);
-	return s * pow(base, float(abs(exponent)));
-}
-
 float distanceMetric(float x1, float y1, float x2, float y2) {
 	if (minkowskiOrder == 0.0) {
 		return 0.0;
@@ -34,10 +29,6 @@ float distanceMetric(float x1, float y1, float x2, float y2) {
 		),
 		1.0 / minkowskiOrder
 	);
-}
-
-float sineFunc(float sine, int exponent) {
-	return (power(sine, 2 * exponent) - 1.0 + colorPortion);
 }
 
 vec4 colorFunc(int n, float scaledForce, float wave) {
@@ -147,11 +138,8 @@ void main() {
 		wave = 0.0;
 	} else {
 		float sine = sin(netForce * sineFrequency / 2.0);
-		int lowerPower = int(sinePower);
-		float upperPowerFrac = fract(sinePower);
 	 	wave = max(
-			((1.0 - upperPowerFrac) *sineFunc(sine, lowerPower) +
-			upperPowerFrac * sineFunc(sine, lowerPower + 1)) / colorPortion,
+			(pow(sine, 2.0) - 1.0 + colorPortion) / colorPortion,
 			0.0
 		);
 	}
@@ -171,17 +159,26 @@ void main() {
 
 	saturation = min(saturation, 1.0) * (maxSaturation - minSaturation) + minSaturation;
 
-	lightness = maxLightness *
-		(waveLightness * wave + 1.0 - waveLightness);
+	float waveLightnessPrime;
+	if (waveLightness < 0.0) {
+		waveLightnessPrime = waveLightness * 1.5 / 2.0;
+	} else if (waveLightness <= 1.0) {
+		waveLightnessPrime = waveLightness * colorPortion;
+	} else if (waveLightness > 1.0) {
+		waveLightnessPrime = colorPortion + (1.0 - colorPortion) * (waveLightness - 1.0);
+	}
+
+	float rawLightness = maxLightness * (waveLightnessPrime * wave + 1.0 - waveLightnessPrime);
+	lightness = max(rawLightness, minLightness);
 
 	float uncoloredPart = maxLightness * (1.0 - colorPortion);
-	if (wave < uncoloredPart && lightness < 0.5) {
-		gradient = lightness / (uncoloredPart * (1.0 - sharpness));
+	if (wave < uncoloredPart) {
+		gradient = rawLightness / (uncoloredPart * (1.0 - sharpness));
+		gradient = max(gradient, 1.0 - waveLightnessPrime);
 		opacity = gradient;
-		saturation = saturation * min(gradient, backgroundSaturation);
+		saturation = saturation * backgroundSaturation;
 		lightness *= 1.0 - contrast;
 	}
-	lightness = max(lightness, minLightness);
 
 	vec4 color = hsla(hue, saturation, lightness, opacity);
 
@@ -195,7 +192,7 @@ void main() {
 
 	fragColor = (1.0 - baseColorFrac) * colorFunc(lowerBaseColor, scaledForce, wave);
 	fragColor += baseColorFrac * colorFunc(upperBaseColor, scaledForce, wave);
-	float pixelBaseIntensity = max(baseIntensity, 1.0 - gradient);
+	float pixelBaseIntensity = max(baseIntensity, (1.0 - gradient) * backgroundOpacity);
 	fragColor *= pixelBaseIntensity;
 	fragColor.a =
 		backgroundOpacity * (1.0 - baseIntensity) +

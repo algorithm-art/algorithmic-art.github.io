@@ -66,8 +66,6 @@ export default function Contours() {
 
 		optionsDoc.getElementById('force-distance-weight').addEventListener('input', setNumericProperty('distanceWeight'));
 
-		optionsDoc.getElementById('force-sine-power').addEventListener('input', setNumericProperty('sinePower'));
-
 		optionsDoc.getElementById('force-hue-frequency').addEventListener('input', function (event) {
 			const value = parseFloat(this.value);
 			if (value >= 0) {
@@ -108,9 +106,7 @@ export default function Contours() {
 		optionsDoc.getElementById('force-sharpness').addEventListener('input', function (event) {
 			let value = parseFloat(this.value);
 			if (value >= 0 && value <= 1) {
-				if (value === 1) {
-					value = 0.99;
-				}
+				value = Math.min(value, 0.94);
 				setBgProperty(me, 'sharpness', value);
 				generateBackground(0);
 			}
@@ -156,7 +152,7 @@ export default function Contours() {
 
 		optionsDoc.getElementById('force-wave-lightness').addEventListener('input', function (event) {
 			const value = parseFloat(this.value);
-			if (value <= 1) {
+			if (value >= -2 && value <= 2) {
 				setBgProperty(me, 'waveLightness', value);
 				generateBackground(0);
 			}
@@ -248,6 +244,68 @@ export default function Contours() {
 			}
 		});
 
+		const distributionLabels = new Map();
+		distributionLabels.set('x', ['Left', 'Centre-Left', 'Centre', 'Centre-Right', 'Right']);
+		distributionLabels.set('y', ['Top', 'Middle', 'Bottom']);
+		distributionLabels.set('strength', ['Weak', 'Medium Weak', 'Medium', 'Medium Strong', 'Strong']);
+		distributionLabels.set('saturation', ['Low', 'Medium Low', 'Medium', 'Medium High', 'High']);
+
+		const distributionSelect = optionsDoc.getElementById('force-distribution');
+		const distributionFields = optionsDoc.getElementById('force-distribution-values');
+		distributionSelect.addEventListener('input', function (event) {
+			const varName = this.value;
+			const labels = distributionLabels.get(varName);
+			const values = me[varName + 'Dist'];
+			for (let i = 0; i < labels.length; i++) {
+				const row = distributionFields.children[i];
+				const label = row.children[0];
+				label.innerHTML = labels[i];
+				const input = row.children[1].children[0];
+				input.value = values[i];
+				row.hidden = false;
+			}
+			for (let i = labels.length; i < distributionFields.children.length; i++) {
+				const row = distributionFields.children[i];
+				row.hidden = true;
+			}
+		});
+
+		function updateDistribution(index) {
+			return function (event) {
+				const varName = distributionSelect.value;
+				const distribution = me[varName + 'Dist'];
+				let value;
+				if (this.value.trim() === '') {
+					value = 0;
+				} else {
+					value = parseFloat(this.value);
+				}
+				if (value >= 0 && value !== distribution[index]) {
+					distribution[index] = value;
+					me.randomize();
+					switch (varName) {
+					case 'x':
+						setBgProperty(me, 'positionX');
+						break;
+					case 'y':
+						setBgProperty(me, 'positionY');
+						break;
+					case 'strength':
+						setBgProperty(me, 'strength');
+						break;
+					default:
+						setBgProperty(me, 'saturations');
+					}
+					generateBackground(0);
+				}
+			};
+		}
+
+		for (let i = 0; i < distributionFields.children.length; i++) {
+			const row = distributionFields.children[i];
+			row.children[1].children[0].addEventListener('input', updateDistribution(i));
+		}
+
 		return optionsDoc;
 	});
 
@@ -267,7 +325,6 @@ export default function Contours() {
 	this.divisor = 100;
 	this.base = 2.8;
 	this.sineFrequency = 1;
-	this.sinePower = 1;	// Multiplied by 2 in WebGL
 
 	this.minkowskiOrder = 2;
 	this.distanceWeight = 0; // Canberra distance
@@ -283,11 +340,11 @@ export default function Contours() {
 
 	this.maxLightness = 0.4;
 	this.minLightness = 0;
-	this.waveLightness = 1;
+	this.waveLightness = 2;
 	this.contrast = 0;
 
 	this.colorPortion = 0.5;
-	this.sharpness = 0;
+	this.sharpness = 0.5;
 
 	this.baseColor = 0;
 	this.baseIntensity = 0;
@@ -304,6 +361,7 @@ export default function Contours() {
 }
 
 Contours.prototype.randomize = function () {
+	random.reset();
 	const positionX = this.positionX;
 	const positionY = this.positionY;
 	const strength = this.strength;
@@ -393,7 +451,7 @@ Contours.prototype.randomize = function () {
 Contours.prototype.animatable = {
 	continuous: [
 		'positionX', 'positionY', 'strength', 'fieldConstant', 'fieldExponent',
-		'sinePower', 'sineFrequency', 'divisor', 'base', 'saturations', 'minSaturation',
+		'sineFrequency', 'divisor', 'base', 'saturations', 'minSaturation',
 		'maxSaturation', 'lighting', 'backgroundSaturation', 'contrast', 'baseColor',
 		'baseIntensity', 'baseScale', 'baseBrightness', 'baseSaturation', 'minkowskiOrder',
 		'distanceWeight', 'hueFrequency', 'hueRotation', 'waveHue', 'waveLightness',
