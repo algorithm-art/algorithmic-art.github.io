@@ -752,6 +752,8 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 	const blendDepth = this.blendDepth - 1;
 	const filling = this.filling;
 
+	const bipartitePattern = middleWidth === 0 && middleHeight === 0 ? 8 : 2;
+
 	const left = Math.round(this.left * (canvasWidth - drawWidth));
 	const top = Math.round(this.top * (canvasHeight - drawHeight));
 	context.translate(left + drawWidth / 2, top + drawHeight / 2);
@@ -786,7 +788,7 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 			applyOpacity = applyOpacity || this.opacityEnable === 1;
 			break;
 		}
-		const useCutouts = overlap > 0 && (overlap < 1 || depth === 0 || recursive[4]) && depth >= cutoutDepth;
+		const useCutouts = overlap > 0 && depth >= cutoutDepth;
 		const emphasize = depth <= this.centreEmphasis;
 		const drawPattern = filling !== 'b' && depth <= this.patternDepth;
 		const combinedSpacing = Math.round(spacingNumerator * 3 ** -depth);
@@ -802,13 +804,17 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 		for (let tile of queue) {
 			let {width, height} = tile;
 			const {x, y, relationship} = tile;
-			const permutation = permutations[relationship];
+			let permutationSource = tile;
+			while (permutationSource.relationship === 4) {
+				permutationSource = permutationSource.parent;
+			}
+			const permutation = permutations[permutationSource.relationship];
 			if (overlap > 0) {
 				context.restore();
 				context.save();
 				tile.clip(context);
 			}
-			let bipartiteColoring = this.bipartite ? relationship % 2 : 1;
+			let bipartiteColoring = this.bipartite ? Number(relationship % bipartitePattern !== 0) : 1;
 			let patternLocation = (this.patternLocations & (2 ** (relationship % 2))) !== 0;
 			let patternedCentre;
 			if (relationship === 12) {
@@ -973,7 +979,7 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 				}
 
 				if (!recurse) {
-					if (useCutouts && (!recursive[4] || maxDepth === 0)) {
+					if (useCutouts) {
 						context.clip(clipPath);
 					}
 					if (emphasize) {
@@ -992,6 +998,9 @@ SierpinskiCarpet.prototype.generate = function* (context, canvasWidth, canvasHei
 								lowerLeftCorner, lowerRightCorner, topLeftCornerX
 							);
 						} else {
+							if (bipartiteColoring === 0) {
+								context.fillRect(roundedX, roundedY, roundedWidth, roundedHeight);
+							}
 							if (!emphasize) {
 								context.globalAlpha = this.patternOpacities[bipartiteColoring] * baseOpacity;
 							}

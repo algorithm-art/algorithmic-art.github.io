@@ -125,6 +125,20 @@
 				</div>
 			</div>
 		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="phyllotaxis-wobble-size">
+				Wobble Size
+			</label>
+			<div class="col-3">
+				<input type="number" value="0" class="form-control form-control-sm" id="phyllotaxis-wobble-size">
+			</div>
+			<label class="col-4 second-col col-form-label col-form-label-sm" for="phyllotaxis-wobble-frequency">
+				Wobble Frequency
+			</label>
+			<div class="col-2">
+				<input type="number" value="100" step="10" class="form-control form-control-sm" id="phyllotaxis-wobble-frequency">
+			</div>
+		</div>
 
 		<h5>Petals</h5>
 		<div class="form-row">
@@ -262,9 +276,8 @@
 
 	<div class="tab-pane" id="phyllotaxis-color" role="tabpanel" aria-labelledby="phyllotaxis-color-tab">
 		<div class="form-row form-group">
-			<div class="col-1"></div>
-			<label class="col-2 col-form-label col-form-label-sm">
-				Rotation
+			<label class="col-3 col-form-label col-form-label-sm">
+				Angular Pattern
 			</label>
 			<div class="col-3">
 				<select class="form-control form-control-sm" id="phyllotaxis-color-field">
@@ -278,7 +291,7 @@
 			<div class="col-2">
 				<select class="form-control form-control-sm" id="phyllotaxis-angle-mode">
 					<option value="t">&theta;</option>
-					<option value="n">n</option>
+					<option value="n">n/d</option>
 					<option value="d">&theta; - r</option>
 				</select>
 			</div>
@@ -287,6 +300,18 @@
 			</label>
 			<div class="col-3">
 				<input class="form-control form-control-sm" type="number" min="1" value="256" id="phyllotaxis-color-mod">
+			</div>
+		</div>
+
+		<div class="form-row form-group">
+			<label class="col-6 col-form-label col-form-label-sm text-right" for="phyllotaxis-color-step">
+				d
+			</label>
+			<div class="col-2">
+				<input type="number" min="1" value="1" class="form-control form-control-sm" id="phyllotaxis-color-step">
+			</div>
+			<div class="col-1"></div>
+			<div class="col-3">
 				<div class="mt-1">
 					<div class="form-check">
 						<input class="form-check-input" type="checkbox" checked id="phyllotaxis-continuous-mod">
