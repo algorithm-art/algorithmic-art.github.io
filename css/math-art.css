@@ -277,6 +277,10 @@ th.col-form-label {
 	overflow-y: auto;
 }
 
+.popover-body h1 {
+	font-size: 1rem;
+}
+
 .progress-bar {
 	overflow: visible;
 }
@@ -298,7 +302,7 @@ th.col-form-label {
 }
 
 .bg-black {
-	background-color: #282828;
+	background-color: #111111;
 	color: white;
 }
 
@@ -308,7 +312,7 @@ th.col-form-label {
 }
 
 .btn-black {
-	background-color: #000000d0;
+	background-color: #000000f7;
 	border-radius: 0;
 	color: white;
 }
