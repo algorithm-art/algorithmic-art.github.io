@@ -557,8 +557,10 @@ function hasRandomness(enabled) {
 	let signatureWidth, signatureHeight, userDisplayName;
 	let signatureText = '';
 	const signatureFont = 'italic 20px Pacifico, cursive';
-	const wmFont = 'bold 30px sans-serif';
+	const signaturePaddingX = 3;
+	const wmFont = '20px "Alfa Slab One", sans-serif';
 	const wmText = 'https://mathematical-art.github.io';
+	let wmWidth, wmHeight;
 
 	function calcSignature() {
 		signatureText = '';
@@ -584,7 +586,7 @@ function hasRandomness(enabled) {
 			context.textAlign = 'left';
 			context.textBaseline = 'bottom';
 			const metrics = context.measureText(signatureText);
-			signatureWidth = 2 * 3 + Math.ceil(metrics.actualBoundingBoxRight);
+			signatureWidth = 2 * signaturePaddingX + Math.ceil(metrics.actualBoundingBoxRight);
 			signatureHeight = 4 + 1 + Math.ceil(metrics.actualBoundingBoxAscent);
 		}
 		signatureBox.style.width = signatureWidth + 'px';
@@ -610,6 +612,7 @@ function hasRandomness(enabled) {
 		let canvasHeight = canvas.height;
 		const backgroundColor = backgroundElement.style.backgroundColor;
 		let [bgRed, bgGreen, bgBlue] = parseColor(backgroundColor)[1];
+		let boxBgRed = bgRed, boxBgGreen = bgGreen, boxBgBlue = bgBlue;
 		let featherOpacity = 1;
 		if (sample) {
 			featherOpacity = 0.2;
@@ -626,54 +629,82 @@ function hasRandomness(enabled) {
 				totalGreen += alpha * pixels[offset + 1] + bgAmount * bgGreen;
 				totalBlue += alpha * pixels[offset + 2] + bgAmount * bgBlue;
 			}
-			bgRed = totalRed / numSamples;
-			bgGreen = totalGreen / numSamples;
-			bgBlue = totalBlue / numSamples;
+			boxBgRed = totalRed / numSamples;
+			boxBgGreen = totalGreen / numSamples;
+			boxBgBlue = totalBlue / numSamples;
 		}
 
 		const scale = contextualInfo.scale;
-		canvasWidth /= scale;
-		canvasHeight /= scale;
+		const scaledWidth = canvasWidth / scale;
+		const scaledHeight = canvasHeight / scale;
 		const fontSize = Math.ceil(20 / scale);
 		context.font = signatureFont.replace('20', fontSize);
-		const scaledWidth = signatureWidth / scale;
-		const scaledHeight = signatureHeight / scale;
-		const top = canvasHeight - scaledHeight;
-		const paddingX = Math.round(3 / scale);
+		const sSignatureWidth = signatureWidth / scale;
+		const sSignatureHeight = signatureHeight / scale;
+		const top = scaledHeight - sSignatureHeight;
+		const paddingX = Math.round(signaturePaddingX / scale);
 		const paddingY = Math.round(4 / scale);
 		const onePx = 1 / scale;
 		const gradient = context.createLinearGradient(0, top, 0, top + paddingY);
-		gradient.addColorStop(0, rgba(bgRed, bgGreen, bgBlue, featherOpacity));
-		gradient.addColorStop(1, rgba(bgRed, bgGreen, bgBlue, 1));
+		gradient.addColorStop(0, rgba(boxBgRed, boxBgGreen, boxBgBlue, featherOpacity));
+		gradient.addColorStop(1, rgba(boxBgRed, boxBgGreen, boxBgBlue, 1));
 		context.fillStyle = gradient;
-		context.fillRect(0, top, scaledWidth, scaledHeight);
-		const luma = rgbToLuma(bgRed, bgGreen, bgBlue);
+		context.fillRect(0, top, sSignatureWidth, sSignatureHeight);
+		let luma = rgbToLuma(boxBgRed, boxBgGreen, boxBgBlue);
 		context.fillStyle = luma >= 0.5 ? 'black' : '#eee';
-		const bottom = canvasHeight - onePx;
+		const bottom = scaledHeight - onePx;
 		context.fillText(signatureText, paddingX, bottom);
+
+		if (sample) {
+			const pixels = context.getImageData(canvasWidth - wmWidth, canvasHeight - wmHeight, wmWidth, wmHeight).data;
+			let totalRed = 0, totalGreen = 0, totalBlue = 0;
+			const numSamples = 50;
+			for (let i = 0; i < numSamples; i++) {
+				const x = Math.trunc(Math.random() * wmWidth);
+				const y = Math.trunc(Math.random() * wmHeight);
+				const offset = (y * signatureWidth + x) * 4;
+				const alpha = pixels[offset + 3] / 255;
+				const bgAmount = 1 - alpha;
+				totalRed += alpha * pixels[offset] + bgAmount * bgRed;
+				totalGreen += alpha * pixels[offset + 1] + bgAmount * bgGreen;
+				totalBlue += alpha * pixels[offset + 2] + bgAmount * bgBlue;
+			}
+			boxBgRed = totalRed / numSamples;
+			boxBgGreen = totalGreen / numSamples;
+			boxBgBlue = totalBlue / numSamples;
+			luma = rgbToLuma(boxBgRed, boxBgGreen, boxBgBlue);
+		}
+
 		context.font = wmFont.replace('20', fontSize);
 		context.textAlign = 'right';
-		context.lineWidth = 1;
+		context.lineWidth = 2;
 		if (luma > 0.5) {
 			context.fillStyle = '#000000b0';
 			context.strokeStyle = '#ffffffb0';
 		} else {
-			context.globalAlpha = 0.3 + 0.7 * luma;
+			context.globalAlpha = 0.5 + 0.5 * luma;
 			context.fillStyle = 'white';
 			context.strokeStyle = 'black';
 		}
-		context.fillText(wmText, canvasWidth - paddingX, bottom);
-		context.strokeText(wmText, canvasWidth - paddingX, bottom);
+		context.fillText(wmText, scaledWidth - paddingX, bottom);
+		context.strokeText(wmText, scaledWidth - paddingX, bottom);
 	}
 
 	function drawSignatureWhenReady(contextualInfo, sample) {
-		if (document.fonts.check(signatureFont)) {
+		Promise.allSettled([
+			document.fonts.load(signatureFont),
+			document.fonts.load(wmFont).then(function () {
+				const context = drawingContext.twoD;
+				context.font = wmFont;
+				context.textAlign = 'right';
+				context.textBaseline = 'bottom';
+				const metrics = context.measureText(wmText);
+				wmWidth = Math.ceil(metrics.actualBoundingBoxLeft);
+				wmHeight = 1 + Math.ceil(metrics.actualBoundingBoxAscent);
+			}),
+		]).then(function () {
 			drawSignature(contextualInfo, sample);
-		} else {
-			document.fonts.load(signatureFont).then(function () {
-				drawSignature(contextualInfo, sample);
-			});
-		}
+		});
 	}
 
 	function progressiveBackgroundDraw(generator, contextualInfo, width, height, preview, callback) {
@@ -1732,8 +1763,10 @@ function hasRandomness(enabled) {
 		if (window.innerWidth < 1024) {
 			if (!mobileLayout) {
 				// Switch to mobile layout
-				while (toolbar.children.length > 0) {
-					overlayContent.appendChild(toolbar.children[0]);
+				const buttons = toolbar.children[1].children;
+				overlayContent.appendChild(toolbar.children[0]);	// Donate button
+				while (buttons.length > 0) {
+					overlayContent.appendChild(buttons[0]);
 				}
 				document.getElementById('btn-floating-action').hidden = false;
 				mobileLayout = true;
@@ -1742,8 +1775,11 @@ function hasRandomness(enabled) {
 			if (mobileLayout) {
 				// Switch to desktop layout
 				overlay.classList.remove('show');
-				while (overlayContent.children.length > 0) {
-					toolbar.appendChild(overlayContent.children[0]);
+				const buttons = overlayContent.children;
+				toolbar.prepend(buttons[0]);	// Donate button
+				const buttonBox = toolbar.children[1];
+				while (buttons.length > 0) {
+					buttonBox.appendChild(buttons[0]);
 				}
 				document.getElementById('btn-floating-action').hidden = true;
 				mobileLayout = false;
@@ -2281,7 +2317,7 @@ function hasRandomness(enabled) {
 		tempCanvas.height = context.canvas.height;
 		tempContext.drawImage(context.canvas, 0, 0);
 		context.filter = filter;
-		context.drawImage(tempCanvas, 0, 0);
+		context.drawImage(tempCanvas, 0, 0, width, height);
 		context.filter = '';
 	}
 
@@ -2511,7 +2547,13 @@ function hasRandomness(enabled) {
 		pauseButton.addEventListener('click', pauseResumeRendering);
 		pauseButton.hidden = false;
 
-		const downloads =  [requireScript('lib/CCapture.webm.min.js')];
+		const downloads =  [];
+		if (imageFormats.has('webp')) {
+			downloads.push(requireScript('lib/CCapture.webm.min.js'));
+		} else {
+			// Library only, no codecs
+			downloads.push(requireScript('lib/CCapture.download.min.js'));
+		}
 		if (properties.format !== 'webm') {
 			downloads.push(requireScript('lib/tar.min.js'));
 		}
@@ -2596,6 +2638,18 @@ function hasRandomness(enabled) {
 	}
 
 	seedInput.value = random.seed;
+
+	if (document.fullscreenEnabled) {
+		document.getElementById('btn-full-screen').addEventListener('click', function (event) {
+			if (document.fullscreenElement === null) {
+				document.documentElement.requestFullscreen({navigationUI: 'hide'});
+			} else {
+				document.exitFullscreen();
+			}
+		});
+	} else {
+		document.getElementById('btn-full-screen').hidden = true;
+	}
 
 	if (store !== undefined) {
 		document.getElementById('show-welcome').addEventListener('input', function (event) {
@@ -3304,13 +3358,55 @@ function hasRandomness(enabled) {
 		currentResOption.selected = true;
 	}
 
+	const imageFormats = new Set();
+	imageFormats.add('png');
+
+	function checkImageFormats() {
+		if (imageFormats.size > 1) {
+			return;
+		}
+
+		const testCanvas = document.createElement('CANVAS');
+		testCanvas.width = 1;
+		testCanvas.height = 1;
+		for (let format of ['jpeg', 'webp']) {
+			const mime = 'image/' + format;
+			const url = testCanvas.toDataURL(mime);
+			if (url.startsWith('data:' + mime)) {
+				imageFormats.add(format);
+			}
+		}
+
+		const videoFormatInput = document.getElementById('video-format');
+		let formatDeleted = false;
+
+		if (!imageFormats.has('jpeg')) {
+			videoFormatInput.querySelector('option[value="jpg"]').remove();
+			formatDeleted = true;
+		}
+		if (!imageFormats.has('webp')) {
+			videoFormatInput.querySelector('option[value="webm"]').remove();
+			videoFormatInput.querySelector('option[value="webp"]').remove();
+			formatDeleted = true;
+		}
+		if (formatDeleted) {
+			setVideoFormat();
+		}
+	}
+
 	document.getElementById('btn-video-opts').addEventListener('click', function (event) {
 		if (document.getElementById('btn-render-video').disabled) {
 			// Video rendering already in progress.
 			$('#video-modal').modal('show');
 			return;
 		}
-		requireScript('lib/CCapture.webm.min.js');
+		checkImageFormats();
+		if (imageFormats.has('webp')) {
+			requireScript('lib/CCapture.webm.min.js');
+		} else {
+			// Library only, no codecs
+			requireScript('lib/CCapture.download.min.js');
+		}
 
 		let unsavedChanges = !currentFrame.isCurrentFrame();
 		const separateFrames = startFrame !== endFrame || ('tween' in bgGenerator);
@@ -3331,14 +3427,19 @@ function hasRandomness(enabled) {
 		}
 	});
 
+	function setVideoFormat() {
+		const format = document.getElementById('video-format').value;
+		const qualitySlider = document.getElementById('video-quality');
+		const lossy = format !== 'png';
+		qualitySlider.disabled = !lossy;
+		videoQualityReadout.innerHTML = lossy ? qualitySlider.value + '%' : 'N/A';
 
-	function loadCodecOnDemand(event) {
-		requireScript('lib/tar.min.js');
-		document.getElementById('video-format').removeEventListener('input', loadCodecOnDemand);
-		loadCodecOnDemand = undefined;
+		if (format !== 'webm') {
+			requireScript('lib/tar.min.js');
+		}
 	}
 
-	document.getElementById('video-format').addEventListener('input', loadCodecOnDemand);
+	document.getElementById('video-format').addEventListener('input', setVideoFormat);
 
 	{
 		const notifyInput = document.getElementById('notify-video-render');
@@ -3410,9 +3511,9 @@ function hasRandomness(enabled) {
 				canvas.hidden = true;
 				document.body.appendChild(captureCanvas);
 			}
-			const scale = videoHeight / screen.height;
+			const scale = videoHeight / window.innerHeight;
 			const drawWidth = videoWidth / scale;
-			const drawHeight = screen.height;
+			const drawHeight = window.innerHeight;
 			const contextualInfo = new DrawingContext(captureCanvas, videoWidth, videoHeight, scale);
 			contextualInfo.initializeShader(bgGenerator);
 			contextualInfo.copyTypes(drawingContext);
@@ -3430,13 +3531,6 @@ function hasRandomness(enabled) {
 	});
 
 	const videoQualityReadout = document.getElementById('video-quality-readout');
-
-	document.getElementById('video-format').addEventListener('input', function (event) {
-		const qualitySlider = document.getElementById('video-quality');
-		const lossy = this.value !== 'png';
-		qualitySlider.disabled = !lossy;
-		videoQualityReadout.innerHTML = lossy ? qualitySlider.value + '%' : 'N/A';
-	});
 
 	document.getElementById('video-quality').addEventListener('input', function (event) {
 		videoQualityReadout.innerHTML = this.value + '%';
