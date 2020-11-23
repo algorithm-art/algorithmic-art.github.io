@@ -48,7 +48,8 @@ function hasRandomness(enabled) {
 		VIEWPORT: 1,
 		COVER: 2,
 	});
-	let scale = 1, scaleMode = ScaleMode.VIEWPORT, blur = 0;
+	let scale = 1, scaleMode = ScaleMode.VIEWPORT;
+	let blur = 0.4;	// No blur
 
 	const canvas = document.getElementById('background-canvas');
 
@@ -776,7 +777,7 @@ function hasRandomness(enabled) {
 
 	function calcBlur(value) {
 		if (value < 0.5) {
-			// Compress 0 to 0.5 into 0.4 to 0.5
+			// Compress values between 0.4 and 0.5 into 0 to 0.5 pixels of blur
 			value = (value - 0.4) * 5;
 		}
 		if (value === 0) {
@@ -788,7 +789,7 @@ function hasRandomness(enabled) {
 
 
 	function transformCanvas(context, width, height, renderWidth, renderHeight, rotation) {
-		context.translate(Math.trunc(width / 2), Math.trunc(height / 2));
+		context.translate(Math.trunc(renderWidth / 2), Math.trunc(renderHeight / 2));
 		context.rotate(rotation);
 		context.translate(Math.trunc(-renderWidth / 2), Math.trunc(-renderHeight / 2));
 	}
@@ -2317,6 +2318,7 @@ function hasRandomness(enabled) {
 		tempCanvas.height = context.canvas.height;
 		tempContext.drawImage(context.canvas, 0, 0);
 		context.filter = filter;
+		// width and height are not superfluous because the canvas is scaled
 		context.drawImage(tempCanvas, 0, 0, width, height);
 		context.filter = '';
 	}
@@ -2399,7 +2401,7 @@ function hasRandomness(enabled) {
 				context.fillStyle = backgroundColor;
 				context.fillRect(0, 0, width, height);
 				context.fillStyle = 'black';
-				if (blur > 0) {
+				if (blur > 0.4) {
 					context.globalCompositeOperation = 'source-over';
 					applyFilter(context, calcBlur(blur), width, height);
 				}
@@ -2551,10 +2553,9 @@ function hasRandomness(enabled) {
 		if (imageFormats.has('webp')) {
 			downloads.push(requireScript('lib/CCapture.webm.min.js'));
 		} else {
-			// Library only, no codecs
-			downloads.push(requireScript('lib/CCapture.download.min.js'));
+			downloads.push(requireScript('lib/CCapture.mjpg.min.js'));
 		}
-		if (properties.format !== 'webm') {
+		if (properties.format !== 'webm' && properties.format !== 'mjpg') {
 			downloads.push(requireScript('lib/tar.min.js'));
 		}
 
@@ -3388,6 +3389,14 @@ function hasRandomness(enabled) {
 			videoFormatInput.querySelector('option[value="webm"]').remove();
 			videoFormatInput.querySelector('option[value="webp"]').remove();
 			formatDeleted = true;
+
+			if (imageFormats.has('jpeg')) {
+				const option = document.createElement('OPTION');
+				option.value = 'mjpg';
+				option.innerHTML = 'MJPEG-AVI Video';
+				videoFormatInput.prepend(option);
+				videoFormatInput.value = 'mjpg';
+			}
 		}
 		if (formatDeleted) {
 			setVideoFormat();
@@ -3404,8 +3413,7 @@ function hasRandomness(enabled) {
 		if (imageFormats.has('webp')) {
 			requireScript('lib/CCapture.webm.min.js');
 		} else {
-			// Library only, no codecs
-			requireScript('lib/CCapture.download.min.js');
+			requireScript('lib/CCapture.mjpg.min.js');
 		}
 
 		let unsavedChanges = !currentFrame.isCurrentFrame();
@@ -3434,7 +3442,7 @@ function hasRandomness(enabled) {
 		qualitySlider.disabled = !lossy;
 		videoQualityReadout.innerHTML = lossy ? qualitySlider.value + '%' : 'N/A';
 
-		if (format !== 'webm') {
+		if (format !== 'webm' && format !== 'mjpg') {
 			requireScript('lib/tar.min.js');
 		}
 	}
