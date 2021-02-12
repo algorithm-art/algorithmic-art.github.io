@@ -11,17 +11,21 @@ Anchor points:
 	1/3 and 2/3 along each edge*
 	* Notional positions that can be adjusted to any symmetric formation, e.g. 1/4 and 3/4
 
+0	1	2	3	4
+15				5
+14				6
+13				7
+12	11	10	9	8
+
 3 or 4 lines meeting at the corners of several tiles
 	Use probabilities to decide whether to use 1, 2, 3 or 4 colours (flow / don't flow)
-
-"A or B" style connections
-	E.g. For Tile Set 7 it should be able to connect a semicircle with just one quarter circle
 
 Colours
 	A chosen number of basic colours (1-16 plus background colour)
 	Colour varies along the length of a line
-		Fixed hue (except when fading between hues at a t-junction)
+		Fixed hue (except when fading between hues at a junction)
 		Saturation or brightness or opacity varies between chosen minimum and maximum value (or no variation at all)
+	OR across the width of a line (shaded like a pipe)
 	VGA / retro style default palette
 
 Tile 18 (cross)
@@ -48,6 +52,23 @@ Tile Sets Variants
 	Draw / Don't draw path outlines
 	Round off the ends of lines by drawing into a neighbouring cell (or don't)
 
+Colour Assignment
+	Colours don't necessarily have to flow, can be contrasting instead
+	Probability parameters for flow/don't flow
+		Flow through a tile to another port / flow backwards from start point
+		Connections at tile corners (2 probability distributions)
+			Max Directions	Option 1	Option 2	Option 3
+			3				Straight 	Bent 		T-shape
+			4				Straight 	Bent 		Cross
+	Modes
+		1 Random
+		2 Random but the same for each tile of the same type
+		3 Flowing
+		4 Assign colours and shapes based upon colours in a bitmap image (https://newscentral.africa/geometric-art-litema-sesotho/)
+	"A or B" style connections
+		E.g. For Tile Set 7 it should be able to connect a semicircle with just one quarter circle
+	Option to have the colours in the palette organized into contrasting pairs so the same colours always contrast each other.
+
 Filled Tile Sets
 	Background colour flows like the other colours (or isn't used at all)
 	But no two colours can be the same
@@ -57,7 +78,8 @@ Tsuro tiles
 	Anchor points joined in pairs
 
 Custom tileset
-	Uploaded from a multiple graphics files
+	Uploaded from multiple graphics files
+	Recolourable?
 
 Tile Selection Order
 	Outwards from the centre of the screen (so that it zooms from the centre)
@@ -77,14 +99,34 @@ Modes of pattern codeword interpretation (in addition to fully random option)
 		Begin with the first pattern.
 		Repeat the pattern horizontally.
 		Switch to the next pattern when beginning a new row.
-		Once every pattern has bee used then return to the first one.
+		Once every pattern has been used then return to the first one.
+		Mirroring options (optional):
+			Horizontal: enter the required patterns manually
+			Vertical: 01|23|45 becomes 01|23|45|4'5'|2'3'|0'|1' where 0' is the vertically flipped version of tile 0
 	Repeat X, Permutate Y
-		Begin with a random pattern.
-		Repeat the pattern horizontally.
-		Switch to a different random pattern when beginning a new row until each pattern has been used once.
-		Once every pattern has been used then choose a random pattern, different to the last row rendered so far.
-		Keep selecting different patterns until every pattern has been twice.
-		Keep repeating the procedure.
+		1 Begin with a random pattern.
+		2 Repeat the pattern horizontally.
+		3 Switch to a different random pattern when beginning a new row until each pattern has been used once.
+		4 Once every pattern has been used then choose a random pattern, different to the last row rendered so far.
+		5 Keep selecting different patterns until every pattern has been used again.
+		6 Keep repeating steps 4 & 5.
+		Vertical mirroring option: mirror rows and then repeat instead of Steps 4-6
+	Permutate X, Repeat Y
+		Same as Repeat X, Permutate Y but X and Y are switched (including the length of the patterns running down the screen)
+	Permutate X, Permutate Y
+		1 Begin with a random pattern.
+		2 Choose different patterns until each pattern has been used once or the end of the row is reached
+		3 If the end of the row has not been reached then repeat the entire sequence of patterns until the end of the row is reached.
+		4 Begin the next row with a random pattern different from the first pattern used on the first row
+		5 Keep choosing patterns randomly until each pattern has been used once on the second row or the end of the second row is reached. Use patterns that weren't used on the first row before reusing other patterns.
+		6 Once every pattern has been used as the first pattern on one of the rows completed so far then repeat the entire structure generated up until that point.
+		Vertical mirroring option: Insert Step 5a to vertically mirror everything generated so far before repeating it.
+	Context-Free (or sensitive?) Grammar
+		| represents a new line
+		A group of "start" patterns
+		Expand a given number of times or until the screen is filled
+	Vertical mirroring options may or may not include mirroring the middle/final row (user's choice)
+
 	Random But Use Patterns
 		No repetition left-to-right. Just keep choosing different patterns and fill the screen, left to right, top to bottom.
 		If a pattern doesn't fully fit onto a row then wrap it onto the beginning of the next row.
@@ -156,14 +198,20 @@ Animations
 	Maze traversal
 		Filling in the background coloured parts with another colour
 
+Embellishments
+	Pill shapes inside the pipes
+	Could be animated (like walking ants)
+
 Remapped Spaces
 	Curves going out from the centre to the edge of a circle and curves perpendicular to them (Clock 52)
 
 Tile Shapes
-	Rectangular
-	Chevrons
-	Brick wall pattern?
+	Horizontal offsets for top, middle, bottom and vertical offsets for left, centre and right, thus generalizing:
+		Rectangle
+		Chevron
+		Parallelogram
 	Triangular
+	Brick wall variants of the above
 	Hexagonal (serpentiles)
 	https://en.wikipedia.org/wiki/Euclidean_tilings_by_convex_regular_polygons
 
@@ -192,9 +240,17 @@ More systematic tile numberings (than currently in the folders)
 
 	Tile Set 7
 		8 decimal digit code
-		One shape digit per quadrant
-			0	Rectangle or continuation of half ellipse
-			1	Quarter circle facing inwards
-			2	Quarter circle facing outwards
-		One colour digit per quadrant (0-4)
-			Areas not covered by a shape described above are drawn in Colour 0
+		One shape+rotation digit per quadrant
+			0	Nothing
+			1	Quarter circle, Orientation 0
+			2	Quarter circle, Orientation 1
+			3	Quarter circle, Orientation 2
+			4	Quarter circle, Orientation 3
+			5	Quarter ellipse, Orientation 0
+			6	Quarter ellipse, Orientation 1
+			7	Quarter ellipse, Orientation 2
+			8	Quarter ellipse, Orientation 3
+			9	Rectangle
+		Two colour digits per quadrant (0-7)
+			One for the area covered by the shape described.
+			One for its inverse shape / the background.

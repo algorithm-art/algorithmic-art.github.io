@@ -1,0 +1,162 @@
+<ul class="nav nav-tabs mb-3" role="tablist">
+	<li class="nav-item" role="presentation">
+		<a class="nav-link active" id="tiles-inventory-tab" data-toggle="tab" href="#tiles-inventory" role="tab" aria-controls="tiles-inventory" aria-selected="true">
+			Tiles
+		</a>
+	</li>
+	<li class="nav-item" role="presentation">
+		<a class="nav-link" id="tiles-grid-tab" data-toggle="tab" href="#tiles-grid" role="tab" aria-controls="tiles-grid" aria-selected="false">
+			Grid
+		</a>
+	</li>
+	<li class="nav-item" role="presentation">
+		<a class="nav-link" id="tiles-color-tab" data-toggle="tab" href="#tiles-color" role="tab" aria-controls="tiles-color" aria-selected="false">
+			Colours
+		</a>
+	</li>
+</ul>
+
+<div class="tab-content">
+	<div class="tab-pane active" id="tiles-inventory" role="tabpanel" aria-labelledby="tiles-inventory-tab">
+		<div class="form-row mb-2">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-tile-num">
+				Tile Number
+			</label>
+			<div class="col-2">
+				<select class="form-control form-control-sm" id="tiles-tile-num">
+					<option selected>0</option>
+					<option>1</option>
+					<option>2</option>
+					<option>3</option>
+					<option>4</option>
+					<option>5</option>
+					<option>6</option>
+					<option>7</option>
+					<option>8</option>
+					<option>9</option>
+				</select>
+			</div>
+		</div>
+		<div class="form-row mb-2">
+			<div class="col-3"></div>
+			<div class="col-9 pl-2">
+				<canvas width="256" height="256" id="tiles-design" style="background-color: #999999"></canvas>
+			</div>
+		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-stroke-ratio">
+				Line Width
+			</label>
+			<div class="col-9">
+				<input type="range" id="tiles-stroke-ratio" min="0" max="1" step="0.01" value="0.25" class="form-control-range mt-2">
+			</div>
+		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-gap-probability">
+				Gaps
+			</label>
+			<div class="col-9">
+				<input type="range" id="tiles-gap-probability" min="0" max="1" step="0.01" value="0" class="form-control-range mt-2">
+			</div>
+		</div>
+	</div>
+
+	<div class="tab-pane" id="tiles-grid" role="tabpanel" aria-labelledby="tiles-grid-tab">
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-side-length">
+				Size
+			</label>
+			<div class="col-3">
+				<input type="number" min="1" value="25" id="tiles-side-length" class="form-control form-control-sm">
+			</div>
+			<label class="col-3 col-form-label col-form-label-sm second-col" for="tiles-cell-aspect">
+				Stretch
+			</label>
+			<div class="col-3">
+				<input type="number" min="0" value="1" step="0.1" id="tiles-cell-aspect" class="form-control form-control-sm">
+			</div>
+		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-shear-0">
+				Middle
+			</label>
+			<div class="col-7">
+				<input type="range" min="-1" max="1" step="0.01" value="0" class="form-control-range mt-2" id="tiles-shear-0">
+			</div>
+			<div class="col-2">
+				<button type="button" class="btn btn-light py-0" data-reset="tiles-shear-0" title="Reset middle x-shift">
+					<img src="../img/cross.png" alt="Reset">
+				</button>
+			</div>
+		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-shear-1">
+				Bottom
+			</label>
+			<div class="col-7">
+				<input type="range" min="-1" max="1" step="0.01" value="0" class="form-control-range mt-2" id="tiles-shear-1">
+			</div>
+			<div class="col-2">
+				<button type="button" class="btn btn-light py-0" data-reset="tiles-shear-1" title="Reset bottom x-shift">
+					<img src="../img/cross.png" alt="Reset">
+				</button>
+			</div>
+		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-shear-2">
+				Centre
+			</label>
+			<div class="col-7">
+				<input type="range" min="-1" max="1" step="0.01" value="0" class="form-control-range mt-2" id="tiles-shear-2">
+			</div>
+			<div class="col-2">
+				<button type="button" class="btn btn-light py-0" data-reset="tiles-shear-2" title="Reset centre y-shift">
+					<img src="../img/cross.png" alt="Reset">
+				</button>
+			</div>
+		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-shear-3">
+				Right
+			</label>
+			<div class="col-7">
+				<input type="range" min="-1" max="1" step="0.01" value="0" class="form-control-range mt-2" id="tiles-shear-3">
+			</div>
+			<div class="col-2">
+				<button type="button" class="btn btn-light py-0" data-reset="tiles-shear-3" title="Reset right y-shift">
+					<img src="../img/cross.png" alt="Reset">
+				</button>
+			</div>
+		</div>
+	</div>
+
+	<div class="tab-pane" id="tiles-color" role="tabpanel" aria-labelledby="tiles-color-tab">
+		<div class="form-row mb-3">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-flow-probability">
+				Flow
+			</label>
+			<div class="col-9">
+				<input type="range" min="0" max="1" step="0.01" value="1" class="form-control-range mt-2" id="tiles-flow-probability">
+			</div>
+		</div>
+		<div class="form-row mb-3">
+			<div class="col-3 col-form-label col-form-label-sm">Colours</div>
+			<div class="col-3">
+				<input type="color" value="#e00000">
+			</div>
+			<div class="col-3">
+				<input type="color" value="#007a00">
+			</div>
+		</div>
+		<div class="form-row mb-3">
+			<div class="col-3"></div>
+			<div class="col-3">
+				<input type="color" value="#0000b0">
+			</div>
+			<div class="col-3">
+				<input type="color" value="#ffaa00">
+			</div>
+		</div>
+	</div>
+
+</div>
