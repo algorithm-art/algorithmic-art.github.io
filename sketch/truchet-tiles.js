@@ -34,15 +34,55 @@ export default function TruchetTiles() {
 		drawPreview();
 
 		optionsDoc.getElementById('tiles-tile-num').addEventListener('input', function (event) {
-			currentTileNum = parseInt(this.value);
-			drawPreview();
+			const value = parseInt(this.value);
+			if (value >= 0 && value < me.tileTypes.length) {
+				currentTileNum = value;
+				drawPreview();
+				document.getElementById('tiles-tile-frequency').value = me.tileFrequencies[currentTileNum];
+			}
 		});
 
-		designCanvas.addEventListener('pointerdown', function (event) {
+
+		optionsDoc.getElementById('tiles-add-tile').addEventListener('click', function (event) {
+			currentTileNum = me.tileTypes.length;
+			me.tileTypes[currentTileNum] = new MiddleLineTile('000000000');
+			me.tileFrequencies[currentTileNum] = 1;
+			drawPreview();
+			const tileNumInput = document.getElementById('tiles-tile-num');
+			tileNumInput.value = currentTileNum;
+			tileNumInput.max = currentTileNum;
+			document.getElementById('tiles-del-tile').disabled = false;
+			document.getElementById('tiles-tile-frequency').value = 1;
+		});
+
+		optionsDoc.getElementById('tiles-del-tile').addEventListener('click', function (event) {
+			me.tileTypes.splice(currentTileNum, 1);
+			me.tileFrequencies.splice(currentTileNum, 1);
+			const tileNumInput = document.getElementById('tiles-tile-num');
+			if (currentTileNum > 0) {
+				currentTileNum--;
+				tileNumInput.value = currentTileNum;
+			}
+			tileNumInput.max = me.tileTypes.length - 1;
+			this.disabled = me.tileTypes.length === 1;
+			document.getElementById('tiles-tile-frequency').value = me.tileFrequencies[currentTileNum];
+			drawPreview();
+			generateBackground(0);
+		});
+
+		designCanvas.addEventListener('click', function (event) {
 			const lineWidth = Math.min(Math.max(me.strokeRatio * PREVIEW_SIZE, 42), 72);
 			const currentTile = me.tileTypes[currentTileNum];
 			me.tileTypes[currentTileNum] = currentTile.mutate(event.offsetX, event.offsetY, lineWidth, currentColor);
 			drawPreview();
+			generateBackground(0);
+		});
+
+		optionsDoc.getElementById('tiles-tile-frequency').addEventListener('input', function (event) {
+			const value = parseFloat(this.value);
+			if (value > 0) {
+				me.tileFrequencies[currentTileNum] = value;
+			}
 			generateBackground(0);
 		});
 
@@ -117,7 +157,23 @@ export default function TruchetTiles() {
 	// Probability of a cell being left blank
 	this.gapProbability = 0;
 
-	this.colors = ['#e00000', '#007a00', '#0000b0', '#ffaa00'];	// #887ecb
+	this.colors = [
+		'hsl(  4,  86%, 54%)',	// Red
+		'hsl(148, 100%, 27%)',	// Green
+		'hsl(222,  90%, 32%)',	// Blue
+		'hsl( 49,  95%, 50%)',	// Yellow
+		'hsl(180,  85%, 40%)',	// Turquoise
+		'hsl(345,   6%, 18%)',	// Charcoal Grey
+		'hsl(262,  42%, 49%)',	// Purple
+		'hsl(346,  94%, 83%)',	// Pink
+		'hsl( 94,  63%, 52%)',	// Lime
+		'hsl(201,  87%, 42%)',	// Azure
+		'hsl( 26,  90%, 56%)',	// Orange
+		'hsl(205,   6%, 59%)',	// Grey
+		'hsl(323,  99%, 26%)',	// Grape
+		'hsl(327,  77%, 56%)',	// Magenta
+		'hsl( 30, 100%, 26%)',	// Brown
+	];
 	this.numColors = 4;
 	this.flowProbability = 1;
 
@@ -134,6 +190,8 @@ export default function TruchetTiles() {
 		new MiddleLineTile('001000004'),	// Curve, lower left
 		new MiddleLineTile('000100008'),	// Curve, upper left
 	];
+
+	this.tileFrequencies = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
 }
 
 TruchetTiles.prototype.animatable = {
@@ -148,53 +206,35 @@ TruchetTiles.prototype.animatable = {
 	]
 };
 
+/** Connections from a port on one tile to ports on neighbouring tiles.
+ *	Format: output port -> collection of delta x, delta y, input port number triples
+ */
+TruchetTiles.connections = new Array(16);
+TruchetTiles.connections[ 0] = [ [-1,  0,  4], [ 0, -1, 12], [-1, -1,  8]	];
+TruchetTiles.connections[ 1] = [ [ 0, -1, 11]								];
+TruchetTiles.connections[ 2] = [ [ 0, -1, 10]								];
+TruchetTiles.connections[ 3] = [ [ 0, -1,  9]								];
+TruchetTiles.connections[ 4] = [ [ 1,  0,  0], [ 0, -1,  8], [ 1, -1, 12]	];
+TruchetTiles.connections[ 5] = [ [ 1,  0, 15]								];
+TruchetTiles.connections[ 6] = [ [ 1,  0, 14]								];
+TruchetTiles.connections[ 7] = [ [ 1,  0, 13]								];
+TruchetTiles.connections[ 8] = [ [ 1,  0, 12], [ 0,  1,  4], [ 1,  1,  0]	];
+TruchetTiles.connections[ 9] = [ [ 0,  1,  3]								];
+TruchetTiles.connections[10] = [ [ 0,  1,  2]								];
+TruchetTiles.connections[11] = [ [ 0,  1,  1]								];
+TruchetTiles.connections[12] = [ [-1,  0,  8], [ 0,  1,  0], [-1,  1,  4]	];
+TruchetTiles.connections[13] = [ [-1,  0,  7]								];
+TruchetTiles.connections[14] = [ [-1,  0,  6]								];
+TruchetTiles.connections[15] = [ [-1,  0,  5]								];
+
 TruchetTiles.prototype.connectedTiles = function (x, y, port, width, height) {
-	const locations = [];
-	switch (port) {
-	case 0:
-		locations.push([x - 1, y, 4]);
-		locations.push([x, y - 1, 12]);
-		locations.push([x - 1, y - 1, 8]);
-		break;
-	case 1:
-	case 2:
-	case 3:
-		locations.push([x, y - 1, 12 - port]);
-		break;
-	case 4:
-		locations.push([x + 1, y, 0]);
-		locations.push([x, y - 1, 8]);
-		locations.push([x + 1, y - 1, 12]);
-		break;
-	case 5:
-	case 6:
-	case 7:
-		locations.push([x + 1, y, 20 - port]);
-		break;
-	case 8:
-		locations.push([x + 1, y, 12]);
-		locations.push([x, y + 1, 4]);
-		locations.push([x + 1, y + 1, 0]);
-		break;
-	case 9:
-	case 10:
-	case 11:
-		locations.push([x, y + 1, 12 - port]);
-		break;
-	case 12:
-		locations.push([x - 1, y, 8]);
-		locations.push([x, y + 1, 0]);
-		locations.push([x - 1, y + 1, 4]);
-		break;
-	default:
-		locations.push([x - 1, y, 20 - port]);
-	}
+	const connections = TruchetTiles.connections[port];
 	const filteredLocations = [];
-	for (let location of locations) {
-		const x = location[0];
-		const y = location[1];
-		if (x >= 0 && x < width && y >= 0 && y < height) {
-			filteredLocations.push(location);
+	for (let connection of connections) {
+		const locationX = x + connection[0];
+		const locationY = y + connection[1];
+		if (locationX >= 0 && locationX < width && locationY >= 0 && locationY < height) {
+			filteredLocations.push([locationX, locationY, connection[2]]);
 		}
 	}
 	return filteredLocations;
@@ -284,6 +324,13 @@ TruchetTiles.prototype.generate = function* (context, canvasWidth, canvasHeight,
 		minY--;
 	}
 
+	let tileFrequenciesTotal = 0;
+	const tileCDF = new Array(this.tileFrequencies.length);
+	for (let i = 0; i < tileCDF.length; i++) {
+		tileFrequenciesTotal += this.tileFrequencies[i];
+		tileCDF[i] = tileFrequenciesTotal;
+	}
+
 	const tileMap = new Array(cellsDownCanvas);
 	const lineWidth = Math.max(Math.round(this.strokeRatio * Math.min(cellWidth, cellHeight)), 1);
 
@@ -341,7 +388,11 @@ TruchetTiles.prototype.generate = function* (context, canvasWidth, canvasHeight,
 
 			blankRunLength = 0;
 
-			const tileTypeIndex = Math.trunc(random.next() * this.tileTypes.length);
+			const p = random.next() * tileFrequenciesTotal;
+			let tileTypeIndex = this.tileTypes.length - 1;
+			while (tileTypeIndex > 0 && tileCDF[tileTypeIndex - 1] >= p) {
+				tileTypeIndex--;
+			}
 			tileMapRow[cellX] = new Tile(this.tileTypes[tileTypeIndex]);
 		}
 		unitsProcessed++;
