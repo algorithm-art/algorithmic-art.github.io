@@ -32,7 +32,7 @@ const Placement = Object.freeze({
 	TILE: 0,
 	OFF_SCREEN: 1,
 	EMPTY: 2,
-})
+});
 
 function tileMapLookup(map, x, y, width, height) {
 	if (x < 0 || x >= width || y < 0 || y >= height) {
@@ -77,16 +77,18 @@ class TileType {
 		return this.connections.has(port);
 	}
 
-	mutate(x, y, lineWidth, previewSize, color) {
+	mutate(x, y, previewWidth, previewHeight, lineWidth1, lineWidth2, color) {
 		return this;
 	}
 
-	permittedTiling(map, x, y, width, height) {
+	permittedTiling(map, x, y, width, height, dxNew, dyNew) {
 		let minPossibleConnections = 0;
 		let maxPossibleConnections = this.connections.size;
 		let offScreenConnections = false;
+		let affected = dxNew === 0 && dyNew === 0;
 		for (let outPort of this.connections.keys()) {
 			for (let [dx, dy, inPort] of POSSIBLE_CONNECTIONS[outPort]) {
+				affected = affected || (dx === dxNew && dy === dyNew);
 				const [tile, outcome] = tileMapLookup(map, x + dx, y + dy, width, height);
 				switch (outcome) {
 				case Placement.OFF_SCREEN:
@@ -104,14 +106,14 @@ class TileType {
 			}
 		}
 		if (this.minConnections === 1 && offScreenConnections && maxPossibleConnections < 2) {
-			return false;
+			return !affected;
 		} else {
 			const localConnectivityOK =
 				maxPossibleConnections >= this.minConnections &&
 				minPossibleConnections <= this.maxConnections;
 			const specialConstraintsOK = !this.checkSpecialConstraints ||
 				this.specialConstraintsSatisfied(map, x, y, width, height, minPossibleConnections, maxPossibleConnections);
-			return localConnectivityOK && specialConstraintsOK;
+			return (localConnectivityOK && specialConstraintsOK) || !affected;
 		}
 	}
 
@@ -123,8 +125,9 @@ class TileType {
 		return this.connections.keys();
 	}
 
-	drawPreview(context, lineWidth, previewSize, generator) {
-		this.draw(context, this.preview, 0, 0, previewSize, previewSize, lineWidth, [0, 0, 0, 0], generator);
+	drawPreview(context, width, height, lineWidth1, lineWidth2, generator) {
+		context.clearRect(0, 0, width, height);
+		this.draw(context, this.preview, 0, 0, width, height, lineWidth1, lineWidth2, [0, 0, 0, 0], generator);
 	}
 
 }
@@ -164,16 +167,16 @@ class Tile {
 		return this.tileType.hasPort(port);
 	}
 
-	permittedTiling(tileMap, x, y) {
-		return this.tileType.permittedTiling(tileMap, x, y);
+	permittedTiling(tileMap, x, y, width, height, dxNew, dyNew) {
+		return this.tileType.permittedTiling(tileMap, x, y, width, height, dxNew, dyNew);
 	}
 
 	ports() {
 		return this.tileType.ports();
 	}
 
-	draw(context, x, y, cellWidth, cellHeight, lineWidth, shear, generator) {
-		this.tileType.draw(context, this, x, y, cellWidth, cellHeight, lineWidth, shear, generator);
+	draw(context, x, y, cellWidth, cellHeight, lineWidth1, lineWidth2, shear, generator) {
+		this.tileType.draw(context, this, x, y, cellWidth, cellHeight, lineWidth1, lineWidth2, shear, generator);
 	}
 
 }
@@ -184,12 +187,74 @@ class BlankTile extends TileType {
 		super(new Map(), 0, 4);
 	}
 
-	draw(context, tile, left, top, width, height, lineWidth, shear, generator) {
+	draw(context, tile, left, top, width, height, lineWidth1, lineWidth2, shear, generator) {
 		// Nothing to draw
 	}
 }
 
 const BLANK_TILE = new Tile(new BlankTile());
+
+function chooseTile(tileTypes, cdf, frequenciesTotal, attemptedTypes, colorMode) {
+	const maxTileType = tileTypes.length - 1;
+	const p = random.next() * frequenciesTotal;
+	let tileTypeIndex = maxTileType;
+	while (tileTypeIndex > 0 && cdf[tileTypeIndex - 1] >= p) {
+		tileTypeIndex--;
+	}
+
+	let firstChoice = tileTypeIndex;
+	while (tileTypeIndex > 0 && attemptedTypes.has(tileTypeIndex)) {
+		tileTypeIndex--;
+	}
+
+	if (attemptedTypes.has(tileTypeIndex)) {
+		tileTypeIndex = firstChoice;
+		while (tileTypeIndex < maxTileType && attemptedTypes.has(tileTypeIndex)) {
+			tileTypeIndex++;
+		}
+	}
+
+	attemptedTypes.add(tileTypeIndex);
+	let tile;
+	switch (colorMode) {
+	case 'd':
+		return tileTypes[tileTypeIndex].preview;
+	case 'r':
+		return new Tile(tileTypes[tileTypeIndex]);
+	}
+}
+
+function checkTiling(tileMap, x, y, width, height) {
+	let tile = tileMap[y][x];
+	if (!tile.permittedTiling(tileMap, x, y, width, height, 0, 0)) {
+		return false;
+	}
+	if (y > 0) {
+		if (x > 0) {
+			tile = tileMap[y - 1][x - 1];
+			if (!tile.permittedTiling(tileMap, x - 1, y - 1, width, height, 1, 1)) {
+				return false;
+			}
+		}
+		tile = tileMap[y - 1][x];
+		if (!tile.permittedTiling(tileMap, x, y - 1, width, height, 0, 1)) {
+			return false;
+		}
+		if (x < width - 1) {
+			tile = tileMap[y - 1][x + 1];
+			if (!tile.permittedTiling(tileMap, x + 1, y - 1, width, height, -1, 1)) {
+				return false;
+			}
+		}
+	}
+	if (x > 0) {
+		tile = tileMap[y][x - 1];
+		if (!tile.permittedTiling(tileMap, x - 1, y, width, height, 1, 0)) {
+			return false;
+		}
+	}
+	return true;
+}
 
 function coordinateTransform(xReference, yReference, width, height, shear, relativeX, relativeY) {
 	const halfWidth = width / 2;
@@ -208,4 +273,7 @@ function coordinateTransform(xReference, yReference, width, height, shear, relat
 	return [xReference + transformedX, yReference + transformedY];
 }
 
-export {TileType, Tile, BLANK_TILE, POSSIBLE_CONNECTIONS, coordinateTransform, Placement, tileMapLookup};
+export {
+	TileType, Tile, BLANK_TILE, POSSIBLE_CONNECTIONS, checkTiling, chooseTile,
+	coordinateTransform, Placement, tileMapLookup
+};

@@ -34,72 +34,72 @@ const shapesMap = new Map();
 	 * lines that have the same colour as itself (including itself).
 	 * The weights are 1 = line from top to centre has the same colour as the current line,
 	 * 2 = line from right to centre, 4 = bottom to centre, 8 = left to centre.
+	 * The coordinates are 0 = left or top, 2 = right or bottom, 1 = halfway
 	 */
 	shapesMap.set('0000', new ShapeSet());
-	shapesMap.set('0008', new ShapeSet(null, null, null, [1, 1]));
+	shapesMap.set('0008', new ShapeSet(null, null, null, [2, 2]));
 	shapesMap.set('0200', new ShapeSet(null, [0, 0]));
 	shapesMap.set('0040', new ShapeSet(null, null, [0, 0]));
-	shapesMap.set('1000', new ShapeSet([1, 1]));
+	shapesMap.set('1000', new ShapeSet([2, 2]));
 	shapesMap.set('0a0a', new ShapeSet(null, [1, 1], null, [1, 1]));
 	shapesMap.set('5050', new ShapeSet([1, 1], null, [1, 1]));
-	shapesMap.set('9009', new ShapeSet([0, 0], null, null, [1, 1]));
+	shapesMap.set('9009', new ShapeSet([0, 0], null, null, [2, 2]));
 	shapesMap.set('3300', new ShapeSet([0, 0], [0, 0]));
-	shapesMap.set('0660', new ShapeSet(null, [0, 0], [1, 1]));
+	shapesMap.set('0660', new ShapeSet(null, [0, 0], [2, 2]));
 	shapesMap.set('00cc', new ShapeSet(null, null, [0, 0], [0, 0]));
-	shapesMap.set('0208', new ShapeSet(null, [1, 0], null, [1, 0]));
-	shapesMap.set('1040', new ShapeSet([1, 0], null, [1, 0]));
-	shapesMap.set('1008', new ShapeSet([0, 1], null, null, [0, 1]));
-	shapesMap.set('1200', new ShapeSet([1,0], [1, 0]));
-	shapesMap.set('0240', new ShapeSet(null, [0, 1], [0, 1]));
-	shapesMap.set('0048', new ShapeSet(null, null, [1, 0], [1, 0]));
-	shapesMap.set('d0dd', new ShapeSet([1, 1], null, [1, 1], [0, 0]));
-	shapesMap.set('7770', new ShapeSet([1, 1], [1, 1], [1, 1]));
-	shapesMap.set('bb0b', new ShapeSet([1, 1], [1, 1], null, [0, 0]));
-	shapesMap.set('0eee', new ShapeSet(null, [1, 1], [0, 0], [0, 0]));
-	shapesMap.set('10cc', new ShapeSet([0, 1], null, [0, 1], [0, 0]));
-	shapesMap.set('1660', new ShapeSet([1, 0], [1, 1], [1, 0]));
-	shapesMap.set('9209', new ShapeSet([1, 0], [1, 0], null, [0, 0]));
-	shapesMap.set('02cc', new ShapeSet(null, [0, 1], [0, 1], [0, 0]));
-	shapesMap.set('9049', new ShapeSet([1, 0], null, [1, 0], [0, 0]));
-	shapesMap.set('3340', new ShapeSet([0, 1], [1, 1], [0, 1]));
-	shapesMap.set('3308', new ShapeSet([0, 1], [1, 1], null, [0, 1]));
-	shapesMap.set('0668', new ShapeSet(null, [1, 1], [1, 0], [1, 0]));
-	shapesMap.set('5058', new ShapeSet([1, 1], null, [1, 1], [0, 0]));
-	shapesMap.set('5250', new ShapeSet([1, 1], [1, 1], [1, 1]));
-	shapesMap.set('1a0a', new ShapeSet([0, 0], [1, 1], null, [1, 1]));
-	shapesMap.set('0a4a', new ShapeSet(null, [1, 1], [1, 1], [1, 1]));
-	const cross = new ShapeSet([1, 1], [1, 1], [1, 1], [0, 0]);
-	shapesMap.set('ffff', cross);
-	shapesMap.set('d2dd', cross);
-	shapesMap.set('7778', cross);
-	shapesMap.set('bb4b', cross);
-	shapesMap.set('1eee', new ShapeSet([0, 0], [1, 1], [0, 0], [0, 0]));
-	shapesMap.set('5a5a', cross); // Over-under
-	shapesMap.set('5258', cross);
-	shapesMap.set('9669', new ShapeSet([1, 0], [1, 0], [1, 1], [0, 0]));
-	shapesMap.set('33cc', new ShapeSet([0, 1], [1, 1], [0, 1], [0, 0]));
-	shapesMap.set('1a4a', new ShapeSet([0, 0], [1, 1], [1, 1], [1, 1]));
-	shapesMap.set('1248', new ShapeSet([0.5, 0, 0.5], [0.5, 1, 0.5], [0.5, 1, 0.5], [0.5, 0, 0.5]));
+	shapesMap.set('0208', new ShapeSet(null, [2, 0], null, [2, 0]));
+	shapesMap.set('1040', new ShapeSet([2, 0], null, [2, 0]));
+	shapesMap.set('1008', new ShapeSet([0, 2], null, null, [0, 2]));
+	shapesMap.set('1200', new ShapeSet([2,0], [2, 0]));
+	shapesMap.set('0240', new ShapeSet(null, [0, 2], [0, 2]));
+	shapesMap.set('0048', new ShapeSet(null, null, [2, 0], [2, 0]));
+	shapesMap.set('d0dd', new ShapeSet([1, 1], null, [1, 1], [0, 0, 1]));
+	shapesMap.set('7770', new ShapeSet([1, 1], [2, 2, 1], [1, 1]));
+	shapesMap.set('bb0b', new ShapeSet([0, 0, 1], [1, 1], null, [1, 1]));
+	shapesMap.set('0eee', new ShapeSet(null, [1, 1], [2, 2, 1], [1, 1]));
+	shapesMap.set('10cc', new ShapeSet([0, 2], null, [0, 2], [0, 0]));
+	shapesMap.set('1660', new ShapeSet([2, 0], [2, 0], [2, 0]));
+	shapesMap.set('9209', new ShapeSet([2, 0], [2, 0], null, [0, 0]));
+	shapesMap.set('02cc', new ShapeSet(null, [0, 2], [0, 2], [0, 0]));
+	shapesMap.set('9049', new ShapeSet([2, 0], null, [2, 0], [0, 0]));
+	shapesMap.set('3340', new ShapeSet([0, 0], [0, 2], [0, 2]));
+	shapesMap.set('3308', new ShapeSet([0, 0], [0, 2], null, [0, 2]));
+	shapesMap.set('0668', new ShapeSet(null, [2, 0], [2, 0], [2, 0]));
+	shapesMap.set('5058', new ShapeSet([1, 1], null, [1, 1], [0, 0, 1]));
+	shapesMap.set('5250', new ShapeSet([1, 1], [2, 2, 1], [1, 1]));
+	shapesMap.set('1a0a', new ShapeSet([0, 0, 1], [1, 1], null, [1, 1]));
+	shapesMap.set('0a4a', new ShapeSet(null, [1, 1], [2, 2, 1], [1, 1]));
+	shapesMap.set('ffff', new ShapeSet([1, 0, 1], [1, 2, 1], [1, 2, 1], [1, 0, 1]));
+	shapesMap.set('d2dd', new ShapeSet([1, 1], [2, 2, 1], [1, 1], [0, 0, 1]));
+	shapesMap.set('7778', new ShapeSet([0, 0], [0, 2], [0, 2], [0, 0]));
+	shapesMap.set('bb4b', new ShapeSet([0, 0, 1], [1, 1], [2, 2, 1], [1, 1]));
+	shapesMap.set('1eee', new ShapeSet([0, 0], [2, 0], [0, 0], [0, 0]));
+	shapesMap.set('5a5a', new ShapeSet([1, 1], [2, 2, 1], [1, 1], [0, 0, 1])); // Over-under
+	shapesMap.set('5258', new ShapeSet([2, 2], [2, 2], [2, 2], [0, 0]));
+	shapesMap.set('9669', new ShapeSet([2, 0], [2, 0], [2, 0], [0, 0]));
+	shapesMap.set('33cc', new ShapeSet([0, 2], [0, 2], [0, 2], [0, 0]));
+	shapesMap.set('1a4a', new ShapeSet([0, 0, 1], [1, 1], [2, 2, 1], [1, 1]));
+	shapesMap.set('1248', new ShapeSet([1, 0, 1], [1, 2, 1], [1, 2, 1], [1, 0, 1]));
 
-	shapesMap.set('9249', new ShapeSet([1, 1], [1, 1], [1, 1], [0, 0]));
-	shapesMap.set('12cc', new ShapeSet([0, 0], [1, 1], [0, 0], [0, 0]));
-	shapesMap.set('3348', new ShapeSet([1, 1], [1, 1], [1, 1], [0, 0]));
-	shapesMap.set('1668', new ShapeSet([0, 0], [1, 1], [0, 0], [0, 0]));
+	shapesMap.set('9249', new ShapeSet([2, 2], [2, 2], [2, 2], [0, 0]));
+	shapesMap.set('12cc', new ShapeSet([0, 0], [2, 2], [0, 0], [0, 0]));
+	shapesMap.set('3348', new ShapeSet([2, 2], [2, 2], [2, 2], [0, 0]));
+	shapesMap.set('1668', new ShapeSet([0, 0], [0, 2], [0, 2], [0, 0]));
 
-	/* Alternatives with diagonal lines in the centre
-	shapesMap.set('9249', new ShapeSet([1, 0], [0.5, 1, 0.5], [0.5, 1, 0.5], [0, 0]));
-	shapesMap.set('12cc', new ShapeSet([0.5, 0, 0.5], [0.5, 1, 0.5], [0, 1], [0, 0]));
-	shapesMap.set('3348', new ShapeSet([0, 1], [1, 1], [0.5, 1, 0.5], [0.5, 0, 0.5]));
-	shapesMap.set('1668', new ShapeSet([0.5, 0, 0.5], [1, 0], [1, 1], [0.5, 0, 0.5]));
+	/* Alternatives with diagonal lines in the centre (V-shaped)
+	shapesMap.set('9249', new ShapeSet([2, 0], [1, 2, 1], [1, 2, 1], [0, 0]));
+	shapesMap.set('12cc', new ShapeSet([1, 0, 1], [1, 2, 1], [0, 2], [0, 0]));
+	shapesMap.set('3348', new ShapeSet([0, 2], [2, 2], [1, 2, 1], [1, 0, 1]));
+	shapesMap.set('1668', new ShapeSet([1, 0, 1], [2, 0], [2, 2], [1, 0, 1]));
 	*/
 
-	shapesMap.set('1048', new ShapeSet([0, 0.5], null, [1, 0.5], [1, 0, 0.5]));
-	shapesMap.set('1240', new ShapeSet([0.5, 0], [0, 1, 0.5], [0.5, 1]));
-	shapesMap.set('1208', new ShapeSet([1, 0, 0.5], [1, 0.5], null, [0, 0.5]));
-	shapesMap.set('0248', new ShapeSet(null, [0.5, 1], [0, 1, 0.5], [0.5, 0]));
+	shapesMap.set('1048', new ShapeSet([0, 1], null, [2, 1], [2, 0, 1]));
+	shapesMap.set('1240', new ShapeSet([1, 0], [0, 2, 1], [1, 2]));
+	shapesMap.set('1208', new ShapeSet([2, 0, 1], [2, 1], null, [0, 1]));
+	shapesMap.set('0248', new ShapeSet(null, [1, 2], [0, 2, 1], [1, 0]));
 }
 
-export default class MiddleLineTile extends TileType {
+class MiddleLineTile extends TileType {
 	/**
 	 * First 4 digits: diagonal lines: upper right quadrant, lower right, lower left, upper left
 	 * Second 4 digits: straight lines: up, right, down, left
@@ -207,19 +207,22 @@ export default class MiddleLineTile extends TileType {
 		return (connectedUp || connectedDown) && (connectedLeft || connectedRight);
 	}
 
-	mutate(x, y, lineWidth, previewSize, color) {
-		const halfLength = previewSize / 2;
-		const min = halfLength - lineWidth / 2;
-		const max = halfLength + lineWidth / 2;
+	mutate(x, y, previewWidth, previewHeight, lineWidthH, lineWidthV, color) {
+		const halfWidth = previewWidth / 2;
+		const halfHeight = previewHeight / 2;
+		const minH = halfWidth - lineWidthH / 2;
+		const maxH = halfWidth + lineWidthH / 2;
+		const minV = halfHeight - lineWidthV / 2;
+		const maxV = halfHeight + lineWidthV / 2;
 		let index;
-		if (x >= min && x <= max) {
-			index = y < halfLength ? 4 : 6;
-		} else if (y >= min && y <= max) {
-			index = x < halfLength ? 7 : 5;
-		} else if (x < halfLength) {
-			index = y < halfLength ? 3 : 2;
+		if (x >= minH && x <= maxH) {
+			index = y < halfHeight ? 4 : 6;
+		} else if (y >= minV && y <= maxV) {
+			index = x < halfWidth ? 7 : 5;
+		} else if (x < halfWidth) {
+			index = y < halfHeight ? 3 : 2;
 		} else {
-			index = y < halfLength ? 0 : 1;
+			index = y < halfHeight ? 0 : 1;
 		}
 		let curved = this.curved;
 		// By default transition not present to straight or to a new colour.
@@ -263,14 +266,18 @@ export default class MiddleLineTile extends TileType {
 		}
 	}
 
-	draw(context, tile, left, top, width, height, lineWidth, shear, generator) {
+	/**
+	 * @param {number} lineWidthH The distance from left to right across a vertical line.
+	 * @param {number} lineWidthV The distance from top to bottom across a horizontal line.
+	 */
+	draw(context, tile, left, top, width, height, lineWidthH, lineWidthV, shear, generator) {
 		const transform = coordinateTransform.bind(null, left, top, width, height, shear);
-		const centre = Math.trunc(width / 2);
-		const middle = Math.trunc(height / 2);
-		const lineWidth1 = Math.trunc(lineWidth / 2);
-		const lineWidth2 = Math.ceil(lineWidth / 2);
+		const CENTRE = Math.trunc(width / 2);
+		const MIDDLE = Math.trunc(height / 2);
+		const lineWidthLR = lineWidthH / 2;		// Half of the line width left or right
+		const lineWidthTB = lineWidthV / 2;		// Half of the line width top or bottom
 		const gradient = height / width;
-		const gradient2 = (height + lineWidth) / (width + lineWidth);
+		const gradient2 = (height + lineWidthV) / (width + lineWidthH);
 
 		const topToRight = this.str[0] !== '0';
 		const rightToBottom = this.str[1] !== '0';
@@ -296,90 +303,86 @@ export default class MiddleLineTile extends TileType {
 			matchingColors[2].toString(16) + matchingColors[3].toString(16);
 		const shapes = shapesMap.get(shapeStr);
 
-		function portion(amount, middle) {
-			switch (amount) {
-			case 0:
-				return middle - lineWidth1;
-			case 0.5:
-				return middle;
-			case 1:
-				return middle + lineWidth2;
-			}
-		}
+		const LINE_LEFT = CENTRE - lineWidthLR;
+		const LINE_RIGHT = CENTRE + lineWidthLR;
+		const portionH = [LINE_LEFT, CENTRE, LINE_RIGHT];
+		const LINE_TOP = MIDDLE - lineWidthTB;
+		const LINE_BOTTOM = MIDDLE + lineWidthTB;
+		const portionV = [LINE_TOP, MIDDLE, LINE_BOTTOM];
 
 		if (topToCentre) {
 			context.beginPath();
-			context.moveTo(...transform(centre - lineWidth1, 0));
-			context.lineTo(...transform(centre - lineWidth1, middle - lineWidth1));
-			context.lineTo(...transform(portion(shapes.topX, centre), portion(shapes.topYLeft, middle)));
-			context.lineTo(...transform(centre + lineWidth2, portion(shapes.topYRight, middle)));
-			context.lineTo(...transform(centre + lineWidth2, 0));
+			context.moveTo(...transform(LINE_LEFT, 0));
+			context.lineTo(...transform(LINE_LEFT, LINE_TOP));
+			context.lineTo(...transform(portionH[shapes.topX], portionV[shapes.topYLeft]));
+			context.lineTo(...transform(LINE_RIGHT, portionV[shapes.topYRight]));
+			context.lineTo(...transform(LINE_RIGHT, 0));
 			context.fillStyle = generator.getColor(tile.getColor(2));
 			context.fill();
 		}
 
 		if (bottomToCentre) {
 			context.beginPath();
-			context.moveTo(...transform(centre - lineWidth1, height));
-			context.lineTo(...transform(centre - lineWidth1, middle + lineWidth2));
-			context.lineTo(...transform(portion(shapes.bottomX, centre), portion(shapes.bottomYLeft, middle)));
-			context.lineTo(...transform(centre + lineWidth2, portion(shapes.bottomYRight, middle)));
-			context.lineTo(...transform(centre + lineWidth2, height));
+			context.moveTo(...transform(LINE_LEFT, height));
+			context.lineTo(...transform(LINE_LEFT, LINE_BOTTOM));
+			context.lineTo(...transform(portionH[shapes.bottomX], portionV[shapes.bottomYLeft]));
+			context.lineTo(...transform(LINE_RIGHT, portionV[shapes.bottomYRight]));
+			context.lineTo(...transform(LINE_RIGHT, height));
 			context.fillStyle = generator.getColor(tile.getColor(10));
 			context.fill();
 		}
 
 		if (leftToCentre) {
 			context.beginPath();
-			context.moveTo(...transform(0, middle - lineWidth1));
-			context.lineTo(...transform(centre - lineWidth1, middle - lineWidth1));
-			context.lineTo(...transform(portion(shapes.leftXTop, centre), portion(shapes.leftY, middle)));
-			context.lineTo(...transform(portion(shapes.leftXBottom, centre), middle + lineWidth2));
-			context.lineTo(...transform(0, middle + lineWidth2));
+			context.moveTo(...transform(0, LINE_TOP));
+			context.lineTo(...transform(LINE_LEFT, LINE_TOP));
+			context.lineTo(...transform(portionH[shapes.leftXTop], portionV[shapes.leftY]));
+			context.lineTo(...transform(portionH[shapes.leftXBottom], LINE_BOTTOM));
+			context.lineTo(...transform(0, LINE_BOTTOM));
 			context.fillStyle = generator.getColor(tile.getColor(14));
 			context.fill();
 		}
 
 		if (rightToCentre) {
 			context.beginPath();
-			context.moveTo(...transform(width, middle - lineWidth1));
-			context.lineTo(...transform(middle + lineWidth2, middle - lineWidth1));
-			context.lineTo(...transform(portion(shapes.rightXTop, centre), portion(shapes.rightY, middle)));
-			context.lineTo(...transform(portion(shapes.rightXBottom, centre), middle + lineWidth2));
-			context.lineTo(...transform(width, middle + lineWidth2));
+			context.moveTo(...transform(width, LINE_TOP));
+			context.lineTo(...transform(LINE_RIGHT, LINE_TOP));
+			context.lineTo(...transform(portionH[shapes.rightXTop], portionV[shapes.rightY]));
+			context.lineTo(...transform(portionH[shapes.rightXBottom], LINE_BOTTOM));
+			context.lineTo(...transform(width, LINE_BOTTOM));
 			context.fillStyle = generator.getColor(tile.getColor(6));
 			context.fill();
 		}
 
 		if (topToRight) {
 			context.beginPath()
-			context.moveTo(...transform(centre + lineWidth2, 0));
-			const [x, y] = transform(width, middle - lineWidth1);
+			context.moveTo(...transform(LINE_RIGHT, 0));
+			const [x, y] = transform(width, LINE_TOP);
 			if ((this.curved & 1) === 1) {
 				context.bezierCurveTo(
-					...transform(centre + lineWidth2, C * (middle - lineWidth1)),
-					...transform(width - C * (width / 2 - lineWidth2), middle - lineWidth1),
+					...transform(LINE_RIGHT, C * LINE_TOP),
+					...transform(width - C * (width / 2 - lineWidthLR), LINE_TOP),
 					x, y
 				);
-				context.lineTo(...transform(width, middle + lineWidth2));
+				context.lineTo(...transform(width, LINE_BOTTOM));
 				context.bezierCurveTo(
-					...transform(width - C * (width / 2 + lineWidth1), middle + lineWidth2),
-					...transform(centre - lineWidth1, C * (middle + lineWidth2)),
-					...transform(centre - lineWidth1, 0)
+					...transform(width - C * (width / 2 + lineWidthLR), LINE_BOTTOM),
+					...transform(LINE_LEFT, C * LINE_BOTTOM),
+					...transform(LINE_LEFT, 0)
 				);
 			} else {
 				context.lineTo(x, y);
 				if (rightToCentre) {
-					context.lineTo(...transform(width - lineWidth / gradient, middle - lineWidth1));
+					context.lineTo(...transform(width - lineWidthV / gradient, LINE_TOP));
 				} else {
-					context.lineTo(...transform(width, middle + lineWidth2));
+					context.lineTo(...transform(width, LINE_BOTTOM));
 				}
 				if (topToCentre) {
-					context.lineTo(...transform(centre + lineWidth2, lineWidth * gradient));
+					context.lineTo(...transform(LINE_RIGHT, lineWidthH * gradient));
 				} else if (leftToTop) {
-					context.lineTo(...transform(centre, lineWidth / 2 * gradient2));
+					context.lineTo(...transform(CENTRE, lineWidthH / 2 * gradient2));
 				} else {
-					context.lineTo(...transform(centre - lineWidth1, 0));
+					context.lineTo(...transform(LINE_LEFT, 0));
 				}
 			}
 			context.fillStyle = generator.getColor(tile.getLineColor(2, 6));
@@ -388,33 +391,33 @@ export default class MiddleLineTile extends TileType {
 
 		if (rightToBottom) {
 			context.beginPath();
-			context.moveTo(...transform(width, middle + lineWidth2));
-			const [x, y] = transform(centre + lineWidth2, height);
+			context.moveTo(...transform(width, LINE_BOTTOM));
+			const [x, y] = transform(LINE_RIGHT, height);
 			if ((this.curved & 2) === 2) {
 				context.bezierCurveTo(
-					...transform(width - C * (width / 2 - lineWidth2), middle + lineWidth2),
-					...transform(centre + lineWidth2, height - C * (height / 2 - lineWidth2)),
+					...transform(width - C * (width / 2 - lineWidthLR), LINE_BOTTOM),
+					...transform(LINE_RIGHT, height - C * (height / 2 - lineWidthTB)),
 					x, y
 				);
-				context.lineTo(...transform(centre - lineWidth1, height));
+				context.lineTo(...transform(LINE_LEFT, height));
 				context.bezierCurveTo(
-					...transform(centre - lineWidth1, height - C * (height / 2 + lineWidth1)),
-					...transform(width - C * (width / 2 + lineWidth1), middle - lineWidth1),
-					...transform(width, middle - lineWidth1)
+					...transform(LINE_LEFT, height - C * (height / 2 + lineWidthTB)),
+					...transform(width - C * (width / 2 + lineWidthLR), LINE_TOP),
+					...transform(width, LINE_TOP)
 				);
 			} else {
 				context.lineTo(x, y);
 				if (bottomToCentre) {
-					context.lineTo(...transform(centre + lineWidth2, height - lineWidth * gradient));
+					context.lineTo(...transform(LINE_RIGHT, height - lineWidthH * gradient));
 				} else {
-					context.lineTo(...transform(centre - lineWidth1, height));
+					context.lineTo(...transform(LINE_LEFT, height));
 				}
 				if (rightToCentre) {
-					context.lineTo(...transform(width - lineWidth / gradient, middle + lineWidth2));
+					context.lineTo(...transform(width - lineWidthV / gradient, LINE_BOTTOM));
 				} else if (topToRight) {
-					context.lineTo(...transform(width - (lineWidth / 2) / gradient2, middle));
+					context.lineTo(...transform(width - (lineWidthV / 2) / gradient2, MIDDLE));
 				} else {
-					context.lineTo(...transform(width, middle - lineWidth1));
+					context.lineTo(...transform(width, LINE_TOP));
 				}
 			}
 			context.fillStyle = generator.getColor(tile.getLineColor(6, 10));
@@ -423,33 +426,33 @@ export default class MiddleLineTile extends TileType {
 
 		if (bottomToLeft) {
 			context.beginPath();
-			context.moveTo(...transform(centre - lineWidth1, height));
-			const [x, y] = transform(0, middle + lineWidth2);
+			context.moveTo(...transform(LINE_LEFT, height));
+			const [x, y] = transform(0, LINE_BOTTOM);
 			if ((this.curved & 4) === 4) {
 				context.bezierCurveTo(
-					...transform(centre - lineWidth1, height - C * (height / 2 - lineWidth2)),
-					...transform(C * (centre - lineWidth1), middle + lineWidth2),
+					...transform(LINE_LEFT, height - C * (height / 2 - lineWidthTB)),
+					...transform(C * LINE_LEFT, LINE_BOTTOM),
 					x, y
 				);
-				context.lineTo(...transform(0, middle - lineWidth1));
+				context.lineTo(...transform(0, LINE_TOP));
 				context.bezierCurveTo(
-					...transform(C * (centre + lineWidth2), middle - lineWidth1),
-					...transform(centre + lineWidth2, height - C * (height / 2 + lineWidth1)),
-					...transform(centre + lineWidth2, height),
+					...transform(C * LINE_RIGHT, LINE_TOP),
+					...transform(LINE_RIGHT, height - C * (height / 2 + lineWidthTB)),
+					...transform(LINE_RIGHT, height),
 				);
 			} else {
 				context.lineTo(x, y);
 				if (leftToCentre) {
-					context.lineTo(...transform(lineWidth / gradient, middle + lineWidth2));
+					context.lineTo(...transform(lineWidthV / gradient, LINE_BOTTOM));
 				} else {
-					context.lineTo(...transform(0, middle - lineWidth1));
+					context.lineTo(...transform(0, LINE_TOP));
 				}
 				if (bottomToCentre) {
-					context.lineTo(...transform(centre - lineWidth1, height - lineWidth * gradient));
+					context.lineTo(...transform(LINE_LEFT, height - lineWidthH * gradient));
 				} else if (rightToBottom) {
-					context.lineTo(...transform(centre, height - lineWidth / 2 * gradient2));
+					context.lineTo(...transform(CENTRE, height - lineWidthH / 2 * gradient2));
 				} else {
-					context.lineTo(...transform(centre + lineWidth2, height));
+					context.lineTo(...transform(LINE_RIGHT, height));
 				}
 			}
 			context.fillStyle = generator.getColor(tile.getLineColor(10, 14));
@@ -458,33 +461,33 @@ export default class MiddleLineTile extends TileType {
 
 		if (leftToTop) {
 			context.beginPath();
-			context.moveTo(...transform(0, middle - lineWidth1));
-			const [x, y] = transform(centre - lineWidth1, 0);
+			context.moveTo(...transform(0, LINE_TOP));
+			const [x, y] = transform(LINE_LEFT, 0);
 			if ((this.curved & 8) === 8) {
 				context.bezierCurveTo(
-					...transform(C * (centre - lineWidth1), middle - lineWidth1),
-					...transform(centre - lineWidth1, C * (middle - lineWidth1)),
+					...transform(C * LINE_LEFT, LINE_TOP),
+					...transform(LINE_LEFT, C * LINE_TOP),
 					x, y
 				);
-				context.lineTo(...transform(centre + lineWidth2, 0));
+				context.lineTo(...transform(LINE_RIGHT, 0));
 				context.bezierCurveTo(
-					...transform(centre + lineWidth2, C * (middle + lineWidth2)),
-					...transform(C * (centre + lineWidth2), middle + lineWidth2),
-					...transform(0, middle + lineWidth2)
+					...transform(LINE_RIGHT, C * LINE_BOTTOM),
+					...transform(C * LINE_RIGHT, LINE_BOTTOM),
+					...transform(0, LINE_BOTTOM)
 				);
 			} else {
 				context.lineTo(x, y);
 				if (topToCentre) {
-					context.lineTo(...transform(centre - lineWidth1, lineWidth * gradient));
+					context.lineTo(...transform(LINE_LEFT, lineWidthH * gradient));
 				} else {
-					context.lineTo(...transform(centre + lineWidth2, 0));
+					context.lineTo(...transform(LINE_RIGHT, 0));
 				}
 				if (leftToCentre) {
-					context.lineTo(...transform(lineWidth / gradient, middle - lineWidth1));
+					context.lineTo(...transform(lineWidthV / gradient, LINE_TOP));
 				} else if (bottomToLeft) {
-					context.lineTo(...transform((lineWidth / 2) / gradient2, middle));
+					context.lineTo(...transform((lineWidthV / 2) / gradient2, MIDDLE));
 				} else {
-					context.lineTo(...transform(0, middle + lineWidth2));
+					context.lineTo(...transform(0, LINE_BOTTOM));
 				}
 			}
 			context.fillStyle = generator.getColor(tile.getLineColor(14, 2));
@@ -493,3 +496,43 @@ export default class MiddleLineTile extends TileType {
 	}
 
 }
+
+const diamondConnections = new Map();
+diamondConnections.set( 2, new Set([6, 10, 14]));
+diamondConnections.set( 6, new Set([2, 10, 14]));
+diamondConnections.set(10, new Set([2,  6, 14]));
+diamondConnections.set(14, new Set([2,  6, 10]));
+const diamondColors = new Map();
+diamondColors.set(2, 5);
+diamondColors.set(6, 5);
+diamondColors.set(10, 5);
+diamondColors.set(14, 5);
+
+class Diamond extends TileType {
+	constructor(minConnections, maxConnections, checkSpecialConstraints) {
+		super(diamondConnections, minConnections, maxConnections, checkSpecialConstraints);
+		this.preview = new Tile(this, diamondColors);
+	}
+
+	specialConstraintsSatisfied(map, x, y, width, height, minPossibleConnections, maxPossibleConnections) {
+		if (this.minConnections < 2) {
+			return true;
+		}
+		let connectedUp = false, connectedRight = false, connectedDown = false, connectedLeft = false;
+		let [tile, outcome] = tileMapLookup(map, x, y - 1, width, height);
+		connectedUp = outcome !== Placement.TILE || tile.hasPort(10);
+		[tile, outcome] = tileMapLookup(map, x + 1, y, width, height);
+		connectedRight = outcome !== Placement.TILE || tile.hasPort(14);
+		[tile, outcome] = tileMapLookup(map, x, y + 1, width, height);
+		connectedDown = outcome !== Placement.TILE || tile.hasPort(2);
+		[tile, outcome] = tileMapLookup(map, x - 1, y, width, height);
+		connectedLeft = outcome !== Placement.TILE || tile.hasPort(6);
+		return (connectedUp || connectedDown) && (connectedLeft || connectedRight);
+	}
+
+	draw(context, tile, left, top, width, height, lineWidthH, lineWidthV, shear, generator) {
+
+	}
+}
+
+export {MiddleLineTile, Diamond};

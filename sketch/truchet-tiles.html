@@ -35,6 +35,15 @@
 					<button type="button" class="btn btn-light" title="New design" id="tiles-add-tile">
 						<img src="../img/plus_light_blue.png" width="16" height="16" alt="Add">
 					</button>
+					<button type="button" class="btn btn-light dropdown-toggle dropdown-toggle-split" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+						<span class="sr-only">Show irregular tile designs</span>
+					</button>
+					<div class="dropdown-menu py-1 w-fit lg-light" id="tiles-specials">
+						<button type="button" class="dropdown-item w-100 px-2 d-flex justify-content-between" value="pipe-diamond">
+							<img src="tiles/2/diamond.webp" alt="" width="24" height="24" class="mr-2">
+							<div class="flex-grow-1">Diamond</div>
+						</button>
+					</div>
 					<button type="button" class="btn btn-light" title="Delete design" id="tiles-del-tile">
 						<img src="../img/delete.png" width="16" height="16" alt="Delete">
 					</button>
@@ -42,9 +51,8 @@
 			</div>
 		</div>
 		<div class="form-row mb-2">
-			<div class="col-3"></div>
-			<div class="col-9 pl-2">
-				<canvas width="256" height="256" id="tiles-design" style="background-color: #999999" title="Tile designer"></canvas>
+			<div class="col-12 text-center">
+				<canvas width="252" height="252" id="tiles-design" style="background-color: #999999" title="Tile designer"></canvas>
 			</div>
 		</div>
 		<div class="form-row form-group">
@@ -55,13 +63,13 @@
 				Tile Frequency
 			</label>
 			<div class="col-3">
-				<input type="number" min="0" value="1" class="form-control form-control-sm" id="tiles-tile-frequency">
+				<input type="number" min="0" value="6" class="form-control form-control-sm" id="tiles-tile-frequency">
 			</div>
 			<div class="col-auto">
 				<div class="mt-1">
 					<div class="form-check">
 						<input type="checkbox" class="form-check-input" checked id="tiles-check-special-constraints">
-						<label class="form-check-label small" for="tiles-special-constraint">
+						<label class="form-check-label small" for="tiles-check-special-constraints">
 							Apply special constraints
 						</label>
 					</div>
@@ -75,19 +83,42 @@
 			<div class="col-3">
 				<input type="number" min="0" max="16" value="3" class="form-control form-control-sm" id="tiles-min-connections">
 			</div>
-			<label class="col-3col-form-label col-form-label-sm" for="tiles-max-connections">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-max-connections">
 				Max Connections
 			</label>
 			<div class="col-3">
 				<input type="number" min="0" max="16" value="4" class="form-control form-control-sm" id="tiles-max-connections">
 			</div>
 		</div>
-		<div class="form-row form-group">
-			<label class="col-3 col-form-label col-form-label-sm" for="tiles-stroke-ratio">
-				Line Width
+		<div class="form-row mb-1">
+			<div class="col-3"></div>
+			<div class="col-9">
+				<div class="form-check form-check-inline">
+					<input type="radio" name="tiles-line-widths" class="form-check-input" id="tiles-line-widths-1" checked>
+					<label class="form-check-label small mr-4" for="tiles-line-widths-1">
+						Single line width
+					</label>
+					<input type="radio" name="tiles-line-widths" class="form-check-input" id="tiles-line-widths-2">
+					<label class="form-check-label small" for="tiles-line-widths-2">
+						Two line widths
+					</label>
+				</div>
+			</div>
+		</div>
+		<div class="form-row mb-1">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-stroke-ratio1">
+				Line Width <span id="tiles-line-width-label" hidden>&LeftRightArrow;</span>
 			</label>
 			<div class="col-9">
-				<input type="range" id="tiles-stroke-ratio" min="0" max="1" step="0.01" value="0.25" class="form-control-range mt-2">
+				<input type="range" id="tiles-stroke-ratio1" min="0" max="1" step="0.01" value="0.25" class="form-control-range mt-2">
+			</div>
+		</div>
+		<div class="form-row collapse" id="tiles-line-width-2">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-stroke-ratio2">
+				Line Width &updownarrow;
+			</label>
+			<div class="col-9">
+				<input type="range" id="tiles-stroke-ratio2" min="0" max="1" step="0.01" value="0.25" class="form-control-range mt-2">
 			</div>
 		</div>
 	</div>
@@ -247,6 +278,28 @@
 				<button type="button" class="btn btn-light py-0" data-reset="tiles-shear-3" title="Reset right y-shift">
 					<img src="../img/cross.png" alt="Reset">
 				</button>
+			</div>
+		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-grid-opacity">
+				Grid Opacity
+			</label>
+			<div class="col-3">
+				<input type="range" min="0" max="1" step="0.04" value="0" class="form-control-range mt-2" id="tiles-grid-opacity">
+			</div>
+			<label class="col-3 second-col col-form-label col-form-label-sm" for="tiles-grid-color">
+				Grid Colour
+			</label>
+			<div class="col-3">
+				<input type="range" min="0" max="255" value="100" class="form-control-range mt-2" id="tiles-grid-color">
+			</div>
+		</div>
+		<div class="form-row form-group">
+			<label class="col-3 col-form-label col-form-label-sm" for="tiles-grid-width">
+				Grid Line Width
+			</label>
+			<div class="col-3">
+				<input type="number" min="0" value="1" class="form-control form-control-sm" id="tiles-grid-width">
 			</div>
 		</div>
 	</div>

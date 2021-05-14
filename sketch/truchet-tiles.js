@@ -1,7 +1,5 @@
-import {Tile, BLANK_TILE, POSSIBLE_CONNECTIONS} from './tilesets/common.js';
-import MiddleLineTile from './tilesets/middle-line.js';
-
-let previewSize;
+import {Tile, BLANK_TILE, POSSIBLE_CONNECTIONS, checkTiling, chooseTile, coordinateTransform} from './tilesets/common.js';
+import {MiddleLineTile, Diamond as PipeDiamond} from './tilesets/middle-line.js';
 
 export default function TruchetTiles() {
 	const me = this;
@@ -10,7 +8,7 @@ export default function TruchetTiles() {
 	this.helpFile = 'help/truchet-tiles.html';
 
 	this.optionsDocument = downloadFile('truchet-tiles.html', 'document').then(function (optionsDoc) {
-
+		let numLineWidths = 1;
 		let redrawTimeout;
 
 		function redraw() {
@@ -26,19 +24,22 @@ export default function TruchetTiles() {
 		}
 
 		listenSlider('tiles-gap-probability', 'gapProbability');
+		listenSlider('tiles-grid-opacity', 'gridOpacity');
+		listenSlider('tiles-grid-color', 'gridColor');
 
 		let editColorIndex = 0;
 		let designColorIndex = 0;
 
 		const designCanvas = optionsDoc.getElementById('tiles-design');
-		previewSize = designCanvas.width;
+		let previewWidth = designCanvas.width;
+		let previewHeight = designCanvas.height;
 		const designContext = designCanvas.getContext('2d');
 		let currentTileNum = 0;
 
 		function drawPreview() {
-			const lineWidth = Math.round(Math.max(me.strokeRatio * previewSize, 1));
-			designContext.clearRect(0, 0, previewSize, previewSize);
-			me.tileTypes[currentTileNum].drawPreview(designContext, lineWidth, previewSize, me);
+			const lineWidth1 = Math.round(Math.max(me.strokeRatio1 * previewWidth, 1));
+			const lineWidth2 = Math.round(Math.max(me.strokeRatio2 * previewHeight, 1));
+			me.tileTypes[currentTileNum].drawPreview(designContext, previewWidth, previewHeight, lineWidth1, lineWidth2, me);
 		}
 
 		drawPreview();
@@ -63,8 +64,8 @@ export default function TruchetTiles() {
 
 		optionsDoc.getElementById('tiles-add-tile').addEventListener('click', function (event) {
 			currentTileNum = me.tileTypes.length;
-			me.tileTypes[currentTileNum] = new MiddleLineTile('000000000', 0, 4, false);
-			me.tileFrequencies[currentTileNum] = 1;
+			me.tileTypes[currentTileNum] = new MiddleLineTile('000000000', 1, 4, false);
+			me.tileFrequencies[currentTileNum] = 6;
 			showTile();
 			document.getElementById('tiles-tile-num').max = currentTileNum;
 			document.getElementById('tiles-del-tile').disabled = false;
@@ -83,9 +84,10 @@ export default function TruchetTiles() {
 		});
 
 		designCanvas.addEventListener('click', function (event) {
-			const lineWidth = Math.min(Math.max(me.strokeRatio * previewSize, 42), 72);
+			const lineWidth1 = Math.min(Math.max(me.strokeRatio1 * previewWidth, 42), 72);
+			const lineWidth2 = Math.min(Math.max(me.strokeRatio2 * previewHeight, 42), 72);
 			const currentTile = me.tileTypes[currentTileNum];
-			me.tileTypes[currentTileNum] = currentTile.mutate(event.offsetX, event.offsetY, lineWidth, previewSize, designColorIndex);
+			me.tileTypes[currentTileNum] = currentTile.mutate(event.offsetX, event.offsetY, previewWidth, previewHeight, lineWidth1, lineWidth2, designColorIndex);
 			drawPreview();
 			generateBackground(0);
 		});
@@ -119,8 +121,34 @@ export default function TruchetTiles() {
 			generateBackground(0);
 		});
 
-		optionsDoc.getElementById('tiles-stroke-ratio').addEventListener('input', function (event) {
-			me.strokeRatio = parseFloat(this.value);
+		optionsDoc.getElementById('tiles-line-widths-1').addEventListener('input', function (event) {
+			$('#tiles-line-width-2').collapse('hide');
+			document.getElementById('tiles-line-width-label').hidden = true;
+			me.strokeRatio2 = me.strokeRatio1;
+			generateBackground(0);
+			drawPreview();
+			numLineWidths = 1;
+		});
+
+		optionsDoc.getElementById('tiles-line-widths-2').addEventListener('input', function (event) {
+			document.getElementById('tiles-stroke-ratio2').value = me.strokeRatio2;
+			$('#tiles-line-width-2').collapse('show');
+			document.getElementById('tiles-line-width-label').hidden = false;
+			numLineWidths = 2;
+		});
+
+		optionsDoc.getElementById('tiles-stroke-ratio1').addEventListener('input', function (event) {
+			const value = parseFloat(this.value);
+			me.strokeRatio1 = value;
+			if (numLineWidths === 1) {
+				me.strokeRatio2 = value;
+			}
+			generateBackground(0);
+			drawPreview();
+		});
+
+		optionsDoc.getElementById('tiles-stroke-ratio2').addEventListener('input', function (event) {
+			me.strokeRatio2 = parseFloat(this.value);
 			generateBackground(0);
 			drawPreview();
 		});
@@ -138,6 +166,17 @@ export default function TruchetTiles() {
 			if (value > 0) {
 				me.cellAspect = value;
 				generateBackground(0);
+				if (value >= 1) {
+					previewWidth = 252 * value;
+					previewHeight = 252;
+				} else {
+					previewWidth = 252;
+					previewHeight = Math.round(previewWidth / value);
+				}
+				designCanvas.style.width = 'min(' + previewWidth + 'px, 100%)';
+				designCanvas.width = previewWidth;
+				designCanvas.height = previewHeight;
+				drawPreview();
 			}
 		});
 
@@ -216,6 +255,9 @@ export default function TruchetTiles() {
 					colorGroupInput.value = groupSize;
 					colorGroupInput.max = maxGroupSize;
 				}
+				if (editColorIndex > numColors - 1) {
+					selectEditColor(numColors - 1);
+				}
 				generateBackground(0);
 			}
 		}
@@ -249,9 +291,13 @@ export default function TruchetTiles() {
 			opacitySlider.value = color[3];
 		}
 
-		function selectEditColor(event) {
+		function selectEditColor(eventOrNumber) {
 			paletteUI.children[editColorIndex].children[0].classList.remove('active');
-			editColorIndex = parseInt(event.target.dataset.index);
+			if (typeof(eventOrNumber) === 'number') {
+				editColorIndex = eventOrNumber;
+			} else {
+				editColorIndex = parseInt(eventOrNumber.target.dataset.index);
+			}
 			paletteUI.children[editColorIndex].children[0].classList.add('active');
 			updateColorSliders();
 		}
@@ -340,6 +386,14 @@ export default function TruchetTiles() {
 		opacitySlider.addEventListener('pointerup', redraw);
 		opacitySlider.addEventListener('keyup', redraw);
 
+		optionsDoc.getElementById('tiles-grid-width').addEventListener('input', function (event) {
+			const value = parseInt(this.value);
+			if (value >= 0) {
+				me.gridWidth = value;
+				generateBackground(0);
+			}
+		});
+
 		return optionsDoc;
 	});
 
@@ -355,10 +409,11 @@ export default function TruchetTiles() {
 		new MiddleLineTile('000400008', 1, 4, false),	// Curve, upper left
 	];
 
-	this.tileFrequencies = [1, 1, 1, 1, 1, 1, 1, 1];
+	this.tileFrequencies = [6, 6, 6, 6, 6, 6, 6, 6];
 
-	// Stroke width as a proportion of the cell's area.
-	this.strokeRatio = 0.25;
+	// Stroke widths as a proportion of the cell's width or height.
+	this.strokeRatio1 = 0.25;
+	this.strokeRatio2 = 0.25;
 
 	// Probability of a cell being left blank
 	this.gapProbability = 0;
@@ -389,6 +444,10 @@ export default function TruchetTiles() {
 
 	this.sideLength = 25;
 	this.cellAspect = 1;
+	this.gridColor = 100;
+	this.gridOpacity = 0;
+	this.gridWidth = 1;
+
 	/*Shearing. Normal range of values is 0-1.
 	 * Element 0: X displacement for the middle
 	 * Element 1: X displacement for the bottom
@@ -401,9 +460,9 @@ export default function TruchetTiles() {
 
 TruchetTiles.prototype.animatable = {
 	'continuous': [
-		'tileFrequencies', 'strokeRatio', 'gapProbability',
+		'tileFrequencies', 'strokeRatio1', 'strokeRatio2', 'gapProbability',
 		'colors', 'flowProbability',
-		'sideLength', 'cellAspect', 'shear',
+		'sideLength', 'cellAspect', 'gridColor', 'gridOpacity', 'gridWidth', 'shear',
 	],
 	'stepped': [
 		'tileTypes',
@@ -531,9 +590,17 @@ TruchetTiles.prototype.generate = function* (context, canvasWidth, canvasHeight,
 		tileFrequenciesTotal += tileFrequencies[i];
 		tileCDF[i] = tileFrequenciesTotal;
 	}
+	const unusedTileTypes = new Set();
+	for (let i = 0; i < tileFrequencies.length; i++) {
+		if (tileFrequencies[i] === 0) {
+			unusedTileTypes.add(i);
+		}
+	}
+	const numTileTypes = this.tileTypes.length;
 
 	const tileMap = new Array(cellsDownCanvas);
-	const lineWidth = Math.max(Math.round(this.strokeRatio * Math.min(cellWidth, cellHeight)), 1);
+	const lineWidth1 = Math.max(Math.round(this.strokeRatio1 * cellWidth), 1);
+	const lineWidth2 = Math.max(Math.round(this.strokeRatio2 * cellHeight), 1);
 
 	let gapProbability = this.gapProbability;
 	let blankSpacing = gapProbability === 0 ? 0 : Math.max(Math.trunc(1 / gapProbability), 1);
@@ -559,8 +626,11 @@ TruchetTiles.prototype.generate = function* (context, canvasWidth, canvasHeight,
 
 	let blankRunLength = 0;
 	let blankDiffusion = 0;
+	let previousRowAttempts = [];
+
 	for (let cellY = 0; cellY < cellsDownCanvas; cellY++) {
 		const tileMapRow = new Array(cellsAcrossCanvas);
+		const currentRowAttempts = [];
 		tileMap[cellY] = tileMapRow;
 
 		if (blankSpacing > 1) {
@@ -588,64 +658,84 @@ TruchetTiles.prototype.generate = function* (context, canvasWidth, canvasHeight,
 			}
 
 			blankRunLength = 0;
-			const attemptedTypes = new Set();
-			for (let i = 0; i < tileFrequencies.length; i++) {
-				if (tileFrequencies[i] === 0) {
-					attemptedTypes.add(i);
-				}
-			}
-			let permitted;
+
+			// TODO generalize to handle diagonal connections
+			let attempts, leftAttempts, upperAttempts;
+			leftAttempts = currentRowAttempts[cellX - 1];
+			upperAttempts = previousRowAttempts[cellX];
+			let permitted, leftPermitted;
+			let changeLeft, changeUpper;
 			do {
-				const p = random.next() * tileFrequenciesTotal;
-				let tileTypeIndex = this.tileTypes.length - 1;
-				while (tileTypeIndex > 0 && (
-					tileCDF[tileTypeIndex - 1] >= p ||
-					attemptedTypes.has(tileTypeIndex)
-				)) {
-					tileTypeIndex--;
-				}
-
-				attemptedTypes.add(tileTypeIndex);
+				const oldLeftTile = tileMapRow[cellX - 1];
 				let tile;
-				switch (this.colorMode) {
-				case 'd':
-					tile = this.tileTypes[tileTypeIndex].preview;
-					break;
+				do {
+					leftPermitted = true;
+					attempts = new Set(unusedTileTypes);
+					do {
+						tile = chooseTile(this.tileTypes, tileCDF, tileFrequenciesTotal, attempts, this.colorMode);
+						tileMapRow[cellX] = tile;
+						permitted = checkTiling(tileMap, cellX, cellY, cellsAcrossCanvas, cellsDownCanvas);
 
-				case 'r':
-					tile = new Tile(this.tileTypes[tileTypeIndex]);
-					break;
-				}
-				tileMapRow[cellX] = tile;
-				permitted = tile.permittedTiling(tileMap, cellX, cellY, cellsAcrossCanvas, cellsDownCanvas);
-				let otherTile;
-				if (cellY > 0 && permitted) {
-					if (cellX > 0) {
-						otherTile = tileMap[cellY - 1][cellX - 1];
-						permitted = otherTile.permittedTiling(tileMap, cellX - 1, cellY - 1, cellsAcrossCanvas, cellsDownCanvas);
-					}
-					otherTile = tileMap[cellY - 1][cellX];
-					permitted = permitted && otherTile.permittedTiling(tileMap, cellX, cellY - 1, cellsAcrossCanvas, cellsDownCanvas);
-					if (cellX < cellsAcrossCanvas - 1 && permitted) {
-						otherTile = tileMap[cellY - 1][cellX + 1];
-						permitted = otherTile.permittedTiling(tileMap, cellX + 1, cellY - 1, cellsAcrossCanvas, cellsDownCanvas);
-					}
-				}
-				if (cellX > 0 && permitted) {
-					otherTile = tileMap[cellY][cellX - 1];
-					permitted = otherTile.permittedTiling(tileMap, cellX - 1, cellY, cellsAcrossCanvas, cellsDownCanvas);
-				}
-			} while (!permitted && attemptedTypes.size < this.tileTypes.length);
-		} // next cellX
+					} while (!permitted && attempts.size < numTileTypes);
 
-		unitsProcessed++;
-		if (unitsProcessed >= benchmark) {
-			const now = calcBenchmark();
-			if (now >= yieldTime) {
-				yield;
+					changeLeft = !permitted && leftAttempts !== undefined && leftAttempts.size < numTileTypes;
+					if (changeLeft) {
+						tileMapRow[cellX] = undefined;
+						do {
+							const leftTile = chooseTile(this.tileTypes, tileCDF, tileFrequenciesTotal, leftAttempts, this.colorMode);
+							tileMapRow[cellX - 1] = leftTile;
+							leftPermitted = checkTiling(tileMap, cellX - 1, cellY, cellsAcrossCanvas, cellsDownCanvas);
+						} while (!leftPermitted && leftAttempts.size < numTileTypes);
+					}
+				} while (changeLeft && leftPermitted);
+				changeUpper = !leftPermitted && upperAttempts !== undefined && upperAttempts.size < numTileTypes;
+				if (changeUpper) {
+					const oldUpperTile = tileMap[cellY - 1][cellX];
+					tileMapRow[cellX] = undefined;
+					do {
+						if (cellX > 0) {
+							tileMapRow[cellX - 1] = undefined;
+							leftAttempts = new Set(unusedTileTypes);
+							currentRowAttempts[cellX - 1] = leftAttempts;
+						}
+						const upperTile = chooseTile(this.tileTypes, tileCDF, tileFrequenciesTotal, upperAttempts, this.colorMode);
+						tileMap[cellY - 1][cellX] = upperTile;
+						permitted = checkTiling(tileMap, cellX, cellY - 1, cellsAcrossCanvas, cellsDownCanvas);
+						if (cellX > 0) {
+							do {
+								const leftTile = chooseTile(this.tileTypes, tileCDF, tileFrequenciesTotal, leftAttempts, this.colorMode);
+								tileMapRow[cellX - 1] = leftTile;
+								permitted = checkTiling(tileMap, cellX - 1, cellY, cellsAcrossCanvas, cellsDownCanvas);
+							} while (!permitted && leftAttempts.size < numTileTypes);
+						}
+					} while (!permitted && upperAttempts.size < numTileTypes);
+
+					if (!permitted) {
+						// Give up but restore previous partial solution
+						tileMap[cellY - 1][cellX] = oldUpperTile;
+						if (cellX > 0) {
+							tileMapRow[cellX - 1] = oldLeftTile;
+						}
+					}
+
+				} else if (!leftPermitted) {
+					// Give up
+					tileMapRow[cellX] = tile;
+				}
+
+			} while (changeUpper);
+			currentRowAttempts[cellX] = attempts;
+
+			unitsProcessed++;
+			if (unitsProcessed >= benchmark) {
+				const now = calcBenchmark();
+				if (now >= yieldTime) {
+					yield;
+				}
 			}
-		}
-	}
+		} // next cellX
+		previousRowAttempts = currentRowAttempts;
+	} // next cellY
 
 	if (this.colorMode === 'r') {
 		const histogram = new Array(this.numColors);
@@ -722,8 +812,48 @@ TruchetTiles.prototype.generate = function* (context, canvasWidth, canvasHeight,
 		for (let cellX = 0; cellX < cellsAcrossCanvas; cellX++) {
 			const x = minX + cellX * cellWidth + cellY * totalShearX;
 			const y = minY + cellY * cellHeight + cellX * totalShearY;
-			tileMapRow[cellX].draw(context, x, y, cellWidth, cellHeight, lineWidth, shear, this);
+			tileMapRow[cellX].draw(context, x, y, cellWidth, cellHeight, lineWidth1, lineWidth2, shear, this);
 		}
+	}
+
+	if (this.gridWidth > 0) {
+		// TODO handle different anchor points
+		context.beginPath();
+		const halfLineWidth1 = lineWidth1 / 2;
+		const halfLineWidth2 = lineWidth2 / 2;
+		const halfCellWidth = cellWidth / 2;
+		const halfCellHeight = cellHeight / 2;
+		context.lineWidth = this.gridWidth;
+		if (this.gridWidth % 2 === 1) {
+			context.translate(0.5, 0.5);
+		}
+		for (let cellY = 0; cellY < cellsDownCanvas; cellY++) {
+			let x = Math.round(minX + cellY * totalShearX);
+			let y = Math.round(minY + (cellY + 1) * cellHeight);
+			context.moveTo(x, y);
+			for (let cellX = 0; cellX < cellsAcrossCanvas; cellX++) {
+				x = Math.round(minX + cellX * cellWidth + cellY * totalShearX);
+				y = Math.round(minY + cellY * cellHeight + cellX * totalShearY);
+				context.lineTo(...coordinateTransform(x, y, cellWidth, cellHeight, shear, halfCellWidth - halfLineWidth1, cellHeight));
+				context.lineTo(...coordinateTransform(x, y, cellWidth, cellHeight, shear, halfCellWidth + halfLineWidth1, cellHeight));
+				context.lineTo(...coordinateTransform(x, y, cellWidth, cellHeight, shear, cellWidth, cellHeight));
+			}
+		}
+		for (let cellX = 0; cellX < cellsAcrossCanvas; cellX++) {
+			let x = Math.round(minX + (cellX + 1) * cellWidth);
+			let y = Math.round(minY + cellX * totalShearY);
+			context.moveTo(x, y);
+			for (let cellY = 0; cellY < cellsDownCanvas; cellY++) {
+				x = Math.round(minX + cellX * cellWidth + cellY * totalShearX);
+				y = Math.round(minY + cellY * cellHeight + cellX * totalShearY);
+				context.lineTo(...coordinateTransform(x, y, cellWidth, cellHeight, shear, cellWidth, halfCellHeight - halfLineWidth2));
+				context.lineTo(...coordinateTransform(x, y, cellWidth, cellHeight, shear, cellWidth, halfCellHeight + halfLineWidth2));
+				context.lineTo(...coordinateTransform(x, y, cellWidth, cellHeight, shear, cellWidth, cellHeight));
+			}
+		}
+		const gridIntensity = this.gridColor;
+		context.strokeStyle = rgba(gridIntensity, gridIntensity, gridIntensity, this.gridOpacity);
+		context.stroke();
 	}
 }
 
